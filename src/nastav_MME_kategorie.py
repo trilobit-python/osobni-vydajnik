@@ -1,0 +1,270 @@
+#!/usr/bin/env python
+# -*- coding: windows-1250 -*-
+# -------------------------------------------------------------------------------
+# Name:        nastavi kategorie a transfery v sqlite DB souboru aplikace MME MoneyManagerEx
+# -------------------------------------------------------------------------------
+
+import re
+import socket
+import sqlite3
+import sys
+
+from common_utils import reg
+
+########################## parameters start #####################################################################
+sRQMoneyEmptyFile = r"..//vydajeMMEX.mmb"
+
+rulePatternCatSubcat = [
+#   pattern, categname:subcatname
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:PØEVOD PROSTØEDKÙ:ŠKOFIN :\'000000-0017145783/0300\':0001130887', 'Automobil:Splátky poøízení'),
+    ('PØÍCHOZÍ PLATBA Z MBANK:VÝPLATA:.*', 'Pøíjmy:Mzda'),
+    ('PØÍCHOZÍ PLATBA Z JINÉ BANKY:000043-3920530227/0100:0138:0000000009', 'Pøíjmy:Mzda'),
+    ('INKASO / DD:UPC-.*:000000-0000247273/5400:0308:0045020281', 'Úèty a faktury:Nájem'),
+    ('ODCHOZÍ PLATBA BANKY:NÁJEMNÉ A ZÁLOHY ZA BYT:000000-0155895339/0800:0000150104', 'Úèty a faktury:Nájem'),
+    ('ODCHOZÍ PLATBA .* BANKY:POPLATKY TELEVIZE A ROZHLAS:.*', 'Úèty a faktury:TV a rozhlas'),
+      # ODCHOZÍ PLATBA DO JINÉ BANKY:POIPLATKY ROZHLAS:ÈESKÝ ROZHLAS POPLATKY :'000000-1071005073/5500':8712191753
+      # ODCHOZÍ PLATBA DO JINÉ BANKY:POPLATKY TELEVIZE A ROZHLAS:ÈESKÁ TELEVIZE :'008029-1800060583/0300':0558:8880165467
+    ('ODCHOZÍ PLATBA BANKY:PRE ZÁLOHY ELEKTØINA NÌMCOVI:000019-2784000277/0100:0020127161', 'Úèty a faktury:Elektøina'),
+    ('ODCHOZÍ PLATBA BANKY:STRAVNÉ MATÌJ NÌMEC:000000-0131545369/0800:0000002084', 'Jídlo:Jídlo mimo domov'),
+    ('ODCHOZÍ PLATBA BANKY:ŽIVOTNÍ POJIŠTÌNÍ FLEXI:000000-1210230319/0800:0012883197', 'Pojištìní:Život'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:NÁJEMNÉ A ZÁLOHY ZA BYT:000000-0155895339/0800:0000150104', 'Úèty a faktury:Nájem'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:POPLATKY TELEVIZE A ROZHLAS:008029-1800060583/0300:0558:8880165467', 'Úèty a faktury:TV a rozhlas'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:SPLÁTKA CREDITNI KARTY:000000-8444444047/2600:6400162807', 'Pøevod úèet-úèet:'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:SPLÁTKA KREDITNÍ KARTY:000000-5160018296/5500:1940350828', 'Pøevod úèet-úèet:'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:SPLÁTKA KREDITNÍ KARTY:SPLÁTKA KREDITNÍ KARTA RAIFFEISENBANK :.*', 'Pøevod úèet-úèet:'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:STRAVNÉ MATÌJ NÌMEC:000000-0131545369/0800:0000002084', 'Jídlo:Jídlo mimo domov'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:ŽIVOTNÍ POJIŠTÌNÍ FLEXI:000000-1210230319/0800:0012883197', 'Pojištìní:Život'),
+    ('POPLATEK ZA .*', 'Úèty a faktury:Bankovní poplatky'),
+    ('POPLATEK ZA BALÍÈEK:POPLATEK - SMS PO SPOTØ.PØEDPL', 'Úèty a faktury:Bankovní poplatky'),
+    ('MÌSÍÈNÍ POPLATEK HL.', 'Úèty a faktury:Bankovní poplatky'),
+    ('STORNO POPLATKU KARTY', 'Úèty a faktury:Bankovní poplatky'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:PRE ZÁLOHY ELEKTØINA NÌMCOVI:000019-2784000277/0100:0020127161', 'Úèty a faktury:Elektøina'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:MATÌJ STAVEBNÍ SPOØENÍ:000000-5714627801/7960:0611124459', 'Spoøení:Matìj spoøení'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:MATÌJ STAVEBNÍ SPOØENÍ:000000-5714627502/7960:0611124459', 'Spoøení:Matìj spoøení'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:.*:000000-1747540405/7960:7107230207', 'Spoøení:Stavební spoøení'),
+    ('INKASO / SIPO:DD:UPC-.*-20.*:000000-0003983815/0300:0308:0045020281', 'Úèty a faktury:Internet'),
+    ('VODAFONE CZECH.*', 'Úèty a faktury:Telefon'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:PØEVOD PROSTØEDKÙ GREENPEACE:000000-0201123744/0300:0000100744:0000000308', 'Zábava:Dobroèinnost'),
+    ('VÝBÌR Z BANKOMATU:.*PROVEDENÍ TRANSAKCE:.*', 'Výbìr hotovosti:'),
+    ('SPLÁTKA - 670100-2200593065/6210', 'Pøevod úèet-úèet:'),
+    ('Splátka klienta', 'Pøevod úèet-úèet:'),
+    ('LIDL.* PRAHA .* CZ', 'Jídlo:Potraviny' ),
+    ('ALBERT.*', 'Jídlo:Potraviny'),
+    ('DM DROGERIE MARKT.*', 'Jídlo:Potraviny' ),
+    ('PONT THE PARK CHODOV PRAHA 4 CZ', 'Jídlo:Potraviny'),
+    ('DOPRAVNI PODNIK HL. M. PRAHA 9 CZ', 'Doprava:MHD a jízdenky'),
+    ('WWW.SAZKAMOBIL.CZ', 'Úèty a faktury:Telefon'),
+    ('VODAFONE CZECH REPUBLI.*', 'Úèty a faktury:Telefon'),
+    ('ALBERT .* PRAHA .* CZ', 'Jídlo:Potraviny' ),
+    ('LIDL.*', 'Jídlo:Potraviny' ),
+    ('FRUITISIMO FRESH', 'Jídlo:Jídlo mimo domov' ),
+    ('YVES ROCHER OC CHODOV', 'Domácnost:Drogerie' ),
+    ('GOOGLE \*EA Mobile','Zábava:Poèítaèové hry'),
+    ('PAYPAL \*ORIGIN.COM', 'Zábava:Poèítaèové hry'),
+    ('LEKARNA SLUNCE LISKOVI.*','Zdravotní péèe:Léky a vitamíny'),
+    ('Dr.Max Lekarna.*','Zdravotní péèe:Léky a vitamíny'),
+    ('GREEN FACTORY','Jídlo:Jídlo mimo domov'),
+    ('PRESTO RESTAURANT CHOD','Jídlo:Jídlo mimo domov'),
+    ('MCDONALD.*','Jídlo:Potraviny'),
+    ('PONT THE PARK CHODOV','Jídlo:Potraviny'),
+    ('NESPRESSO BOUTIQUE','Jídlo:Pochutiny a káva'),
+    ('KREDIT INFO','Úèty a faktury:Bankovní poplatky'),
+    ('ZÚÈTOVÁNÍ ÚROKÙ','Úèty a faktury:Bankovní poplatky'),
+    ('PROFI AUTO CZ.*', 'Automobil:Benzín'),
+    ('SHELL.*', 'Automobil:Benzín'),
+    ('COCA-COLA 1802618106','Jídlo:Pochutiny a káva'),
+    ('HOME OFFICE','Jídlo:Pochutiny a káva'),
+    ('Home Office', 'Jídlo:Pochutiny a káva'),
+    ('DALLMAYR CSOB.*','Jídlo:Pochutiny a káva'),
+    ('DELIKOMAT .*','Jídlo:Pochutiny a káva'),
+    ('KFC .*','Jídlo:Jídlo mimo domov'),
+    ('.* MPASS VERIFY','Úèty a faktury:Bankovní poplatky'),
+    ('COOP Trhova Hradska','Jídlo:Potraviny'),
+    ('COOP DS PJ 11-098','Jídlo:Potraviny'),
+    ('LEKARNA BARRANDOV','Zdravotní péèe:Léky a vitamíny'),
+    ('CINEMA CITY.*','Zábava:Atrakce'),
+    ('NA DOMÁCNOST .*','pøevod Anušce:')
+    ]
+########################## parameters end ##########################
+
+def print_data(data):
+    print(data.description)
+    for row_data in data:
+        print(row_data)
+
+def test_exists(cursor, sqlPartFromWhere, name):
+    s = "SELECT count(*) FROM {!s}{!r}".format(sqlPartFromWhere, name)
+    cursor.execute(s)
+    exist = cursor.fetchone()
+    if exist is not None:
+        if exist[0] > 0:
+            return True
+    return False
+
+def get_first_id(cursor, sqlTableName, sIdName):
+    cursor.execute("SELECT max({!s}) FROM {!s}".format(sIdName, sqlTableName))
+    exist = cursor.fetchone()
+    if exist is None:
+        return 1
+    else:
+        if exist[0] is None:
+            return 1
+        else:
+            return exist[0] + 1
+
+# najde ID z DB pro nazev kategorie a podkategorie
+def find_categid_subcategid(cursor, categname, subcategname):
+    if not subcategname:
+        data = cursor.execute("""select categid, subcategid from v_categ_subcateg where categname=?""", [categname])
+    else:
+        data = cursor.execute("""select categid, subcategid from v_categ_subcateg where categname=? and subcategname=?""", (categname, subcategname))
+    rows = data.fetchall()
+    if len(rows) == 0:
+        print("No data found in table v_categ_subcateg " + " for categname:" + categname + " subcategname:" + subcategname)
+        sys.exit(-1)
+    if len(rows) == 1:
+        row = rows[0]
+        return row[0], row[1]
+    if len(rows) > 1:
+        print("Too many rows found in table v_categ_subcateg" + " for categname:" + categname + " subcategname:" + subcategname)
+        sys.exit(-1)
+
+def set_category_by_rules(CategoryRules, curInput, curUpdate):
+    print("set_category_by_rules")
+    # iterate candidate from DB for update
+    iUpd = 0
+    iCnt = 0
+    data = curInput.execute("""
+        select t.*
+          from CHECKINGACCOUNT_V1 t
+         where t.CATEGID is null
+            or t.CATEGID = (select c.categid from CATEGORY_V1 c where c.CATEGNAME = 'Neznámá')
+         order by transdate desc
+        """)
+#     print(curInput.description)
+    for row in data.fetchall():
+        r = reg(curInput, row)
+        iCnt += 1
+        # check if rule can match
+#         print(row)
+        for rule in CategoryRules.values():
+            bMatch = False
+            if re.search(rule['pattern'], r.NOTES):
+                bMatch = True
+            if bMatch:
+                curUpdate.execute("update CHECKINGACCOUNT_V1 set categid=?, subcategid=? where transid=?",
+                    (rule['categid'], rule['subcatid'], r.TRANSID))
+                if curUpdate.rowcount > 0:
+                    iUpd += 1
+    print("  Uncategorized rows:", iCnt)
+    print("  Updated       rows:", iUpd)
+    print()
+
+def set_transfers(curInput, curUpdate):
+    print("set_transfers")
+    # iterate candidate from DB for update
+    iUpd = 0
+    iCnt = 0
+
+    data = curInput.execute("""
+        select t.TRANSID, t.notes, t.TRANSCODE
+            from CHECKINGACCOUNT_V1 t
+             where t.CATEGID = (select c.categid from CATEGORY_V1 c where c.CATEGNAME = 'Výbìr hotovosti')
+              and t.transcode <> 'Transfer'
+            order by transdate desc
+        """)
+    for row in data.fetchall():
+        r = reg(curInput, row)
+        iCnt += 1
+        curUpdate.execute("""update CHECKINGACCOUNT_V1
+         set transcode='Transfer',
+              toaccountid=(select accountid from ACCOUNTLIST_V1 a where ACCOUNTNAME = 'Hotovost'),
+              payeeid=-1,
+             subcategid=-1 ,
+             totransamount=transamount
+           where transid=""" + str(r.TRANSID))
+        iUpd += 1
+
+    print("  Uncategorized rows:", iCnt)
+    print("  Updated       rows:", iUpd)
+    print()
+
+def local_stavebni_sporeni_update(curInput, curUpdate, callName, accountName):
+    """
+     pro všechny pohyby na úètech se stavebním spoøení nastaví kategorii
+     stavební spoøení popø. Matìjovo
+    """
+    print("  " + callName)
+    categname, subcatname = callName.split(":")
+    categid, subcatid = find_categid_subcategid(curInput, categname, subcatname)
+    curInput.execute("""
+       UPDATE CHECKINGACCOUNT_V1
+          SET CATEGID=?, SUBCATEGID=?
+        where ACCOUNTID = (select a.ACCOUNTID from ACCOUNTLIST_V1 a where a.ACCOUNTNAME = ?)
+          AND (CATEGID<>? or SUBCATEGID<>?)
+        """, (categid, subcatid, accountName, categid, subcatid))
+    iUpd = curInput.rowcount
+    print("  Updated category rows:", iUpd)
+
+    curInput.execute("""
+       UPDATE CHECKINGACCOUNT_V1
+        SET transcode='Transfer',
+              toaccountid=(select accountid from ACCOUNTLIST_V1 a where ACCOUNTNAME = ?),
+              payeeid=-1,
+             totransamount=transamount
+        where
+          CATEGID= ?
+          AND SUBCATEGID =?
+          AND transcode not in ('Transfer')
+          AND  accountid <> (select accountid from ACCOUNTLIST_V1 a where ACCOUNTNAME = ?)
+        """, (accountName, categid, subcatid, accountName))
+    iUpd = curInput.rowcount
+    print("  Updated  to transfer rows:", iUpd)
+
+
+def set_stavebni_sporeni(CategoryRules, curInput, curUpdate):
+    """
+     nastaví kategii a podkategorii pro pohyby z a na úèty se stavebním spoøením
+    """
+    print("set_stavebni_sporeni")
+    local_stavebni_sporeni_update(curInput, curUpdate, "Spoøení:Matìj spoøení", "Stavební spoøení Matìj")
+    local_stavebni_sporeni_update(curInput, curUpdate, "Spoøení:Stavební spoøení", "Stavební spoøení")
+    print()
+
+def create_CategoryRules(rulePatternCatSubcat):
+    # create dictionary from patterns and DB
+    # create dictionary item for rule
+    CategoryRules = dict()
+    # naplneni slovnkiku s pravidly, dotazeni id pro kategorie a subkategorie z db
+    for pattern, categname_subcatname in rulePatternCatSubcat:
+        if ":" not in categname_subcatname:
+            print("Neni kategorie/subkategorie - nenalezen oddìlovaè[:] data:" + categname_subcatname)
+            sys.exit(-1)
+        categname, subcatname = categname_subcatname.split(":")
+        categid, subcatid = find_categid_subcategid(curInput, categname, subcatname)
+        row = {'pattern':pattern, 'categname':categname, 'subcategname':subcatname, 'categid':categid, 'subcatid':subcatid}
+        CategoryRules[pattern] = row
+    #         print(row)
+    print("CategoryRules:" + str(len(CategoryRules.items())))
+    print()
+    return CategoryRules
+
+###  MAIN ################
+
+if socket.gethostname()=='nemecd_nbk':
+    sRQMoneyEmptyFile = r"..//vydajeMMEX.mmb"
+
+print("Soubor:"+sRQMoneyEmptyFile)
+
+connInput = sqlite3.connect(sRQMoneyEmptyFile)
+curInput = connInput.cursor()
+curUpdate = connInput.cursor()
+
+CategoryRules = create_CategoryRules(rulePatternCatSubcat)
+
+set_category_by_rules(CategoryRules, curInput, curUpdate)
+set_stavebni_sporeni(CategoryRules, curInput, curUpdate)
+set_transfers(curInput, curUpdate)
+connInput.commit()
+# connInput.rollback()
+print("Done.")
