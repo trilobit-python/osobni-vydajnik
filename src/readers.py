@@ -185,7 +185,7 @@ class Raiffeisen_cards(xReader):
                                converters={'Datum transakce': self.converter2},
                                keep_default_na=False, quoting=csv.QUOTE_ALL
                                )
-        rows['ord_num_in_grp'] = rows.groupby(['Datum transakce', 'Pùvodní èástka']).cumcount() + 1
+        rows['ord_num_in_grp'] = rows.groupby(['Datum transakce', 'Zaúètovaná èástka', 'Pùvodní èástka', 'Popis/Místo transakce']).cumcount() + 1
 
         for i, row in rows.iterrows():
             xTRANSDATE = row['Datum transakce'].strftime('%Y-%m-%d')  # 2014 - 10 - 21
@@ -198,6 +198,9 @@ class Raiffeisen_cards(xReader):
 
             xTRANSACTIONNUMBER = row['Èíslo kreditní karty'][-4:]
             ord_num_in_grp = row['ord_num_in_grp']
+
+            if xNOTES == 'CARPISA METROPOLE ZLIC':
+                xNOTES = xNOTES
 
             # values             Deposit /  Withdrawal
             if xTRANSAMOUNT > float(0):
