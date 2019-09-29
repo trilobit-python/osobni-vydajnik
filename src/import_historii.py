@@ -10,7 +10,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from readers import Raiffeisen_sporici_ucet, Raiffeisen_bezny_ucet, mBank_bezny_ucet, Raiffeisen_cards
+from readers import Raiffeisen_sporici_ucet, Raiffeisen_bezny_ucet, mBank_bezny_ucet, Raiffeisen_cards, AnnaUcetEra
 from sqlalchemy_declarative import Base
 
 db_file = 'sqlite:///..//vydajeMMEX.mmb'
@@ -26,20 +26,18 @@ session = DBSession()
 # airBank = airBankReader(session)
 # airBank.read()
 
-RB_karty = Raiffeisen_cards(session)
-RB_karty.read()
-
+# OK
+# RB_karty = Raiffeisen_cards(session)
+# RB_karty.read()
 # RB_sporici_ucet = Raiffeisen_sporici_ucet(session)
 # RB_sporici_ucet.read()
-#
 # RB_bezny_ucet = Raiffeisen_bezny_ucet(session)
 # RB_bezny_ucet.read()
-
 # mBank_bezny = mBank_bezny_ucet(session)
 # mBank_bezny.read()
 
-# Anna_ucet_ERA = AnnaUcetEra(session)
-# Anna_ucet_ERA.read()
+Anna_ucet_ERA = AnnaUcetEra(session)
+Anna_ucet_ERA.read()
 
 # xcategoriser = categorizer(session)
 # xcategoriser.set_all()
