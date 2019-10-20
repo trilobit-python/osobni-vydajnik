@@ -3,7 +3,7 @@ from sqlalchemy import Column, Float, Index, Integer, Text, UniqueConstraint
 from sqlalchemy import inspect
 from sqlalchemy.ext.declarative import declarative_base
 
-from sqlite_numeric import SqliteNumeric
+from src.sqlite.sqlite_numeric import SqliteNumeric
 
 Numeric = SqliteNumeric
 

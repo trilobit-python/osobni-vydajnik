@@ -9,14 +9,15 @@ import socket
 import sqlite3
 import sys
 
-from common_utils import reg
+from src.utils.common import Reg
 
 ########################## parameters start #####################################################################
 sRQMoneyEmptyFile = r"..//vydajeMMEX.mmb"
 
 rulePatternCatSubcat = [
-#   pattern, categname:subcatname
-    ('ODCHOZÍ PLATBA DO JINÉ BANKY:PØEVOD PROSTØEDKÙ:ŠKOFIN :\'000000-0017145783/0300\':0001130887', 'Automobil:Splátky poøízení'),
+    #   pattern, categname:subcatname
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:PØEVOD PROSTØEDKÙ:ŠKOFIN :\'000000-0017145783/0300\':0001130887',
+     'Automobil:Splátky poøízení'),
     ('Èerpání bonus prémie', 'Pøíjmy:Bonus premie'),
     ('PØÍCHOZÍ PLATBA Z MBANK:VÝPLATA:.*', 'Pøíjmy:Mzda'),
     ('PØÍCHOZÍ PLATBA Z MBANK:PØEVOD PROSTØEDKÙ:DAVID NÌMEC.*', 'Pøíjmy:Mzda'),
@@ -39,14 +40,16 @@ rulePatternCatSubcat = [
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:PØEVOD PROSTØEDKÙ:GENERALLI POJIŠOVNA.*', 'Pojištìní:Domov'),
     ('ODCHOZÍ PLATBA BANKY:ŽIVOTNÍ POJIŠTÌNÍ FLEXI:000000-1210230319/0800:0012883197', 'Pojištìní:Život'),
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:NÁJEMNÉ A ZÁLOHY ZA BYT:000000-0155895339/0800:0000150104', 'Úèty a faktury:Nájem'),
-    ('ODCHOZÍ PLATBA DO JINÉ BANKY:POPLATKY TELEVIZE A ROZHLAS:008029-1800060583/0300:0558:8880165467', 'Úèty a faktury:TV a rozhlas'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:POPLATKY TELEVIZE A ROZHLAS:008029-1800060583/0300:0558:8880165467',
+     'Úèty a faktury:TV a rozhlas'),
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:SPLÁTKA CREDITNI KARTY:000000-8444444047/2600:6400162807', 'Pøevod úèet-úèet:'),
     ('Pøevod do mBank', 'Pøevod úèet-úèet:'),
     ('.* PROSTØEDKÙ RB TAM-ZPÌT.*', 'Pøevod úèet-úèet:'),
     ('670100-2200593065/6210 DAVID NEMEC Pøíchozí úhrada', 'Pøevod úèet-úèet:'),
     ('.*670100-2200593065/6210 DAVID NÌMEC Pøíchozí úhrada', 'Pøevod úèet-úèet:'),
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:SPLÁTKA KREDITNÍ KARTY:000000-5160018296/5500:1940350828', 'Pøevod úèet-úèet:'),
-    ('ODCHOZÍ PLATBA DO JINÉ BANKY:SPLÁTKA KREDITNÍ KARTY:SPLÁTKA KREDITNÍ KARTA RAIFFEISENBANK :.*', 'Pøevod úèet-úèet:'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:SPLÁTKA KREDITNÍ KARTY:SPLÁTKA KREDITNÍ KARTA RAIFFEISENBANK :.*',
+     'Pøevod úèet-úèet:'),
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:STRAVNÉ MATÌJ NÌMEC:000000-0131545369/0800:0000002084', 'Jídlo:Jídlo mimo domov'),
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:ŽIVOTNÍ POJIŠTÌNÍ FLEXI:000000-1210230319/0800:0012883197', 'Pojištìní:Život'),
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:ŽIVOTNÍ POJIŠTÌNÍ FLEXI:.*000000-1210230319/0800.*', 'Pojištìní:Život'),
@@ -58,9 +61,11 @@ rulePatternCatSubcat = [
     ('POPLATEK ZA BALÍÈEK:POPLATEK - SMS PO SPOTØ.PØEDPL', 'Úèty a faktury:Bankovní poplatky'),
     ('MÌSÍÈNÍ POPLATEK HL.', 'Úèty a faktury:Bankovní poplatky'),
     ('STORNO POPLATKU KARTY', 'Úèty a faktury:Bankovní poplatky'),
-    ('ODCHOZÍ PLATBA DO JINÉ BANKY:PRE ZÁLOHY ELEKTØINA NÌMCOVI:000019-2784000277/0100:0020127161', 'Úèty a faktury:Elektøina'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:PRE ZÁLOHY ELEKTØINA NÌMCOVI:000019-2784000277/0100:0020127161',
+     'Úèty a faktury:Elektøina'),
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:MATÌJ STAVEBNÍ SPOØENÍ:000000-5714627801/7960:0611124459', 'Spoøení:Matìj spoøení'),
-    ('ODCHOZÍ PLATBA DO JINÉ BANKY:MATÌJ STAVEBNÍ SPOØENÍ:ÈMSS STAVEBNÍ SPOØENÍ.*000000-5714627502/7960.*0611124459', 'Spoøení:Matìj spoøení'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:MATÌJ STAVEBNÍ SPOØENÍ:ÈMSS STAVEBNÍ SPOØENÍ.*000000-5714627502/7960.*0611124459',
+     'Spoøení:Matìj spoøení'),
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:MATÌJ STAVEBNÍ SPOØENÍ:000000-5714627801/7960:0611124459', 'Spoøení:Matìj spoøení'),
     ('ODCHOZÍ PLATBA .*ÈMSS STAVEBNÍ SPOØENÍ DAVID.*000000-1747540405/7960.*7107230207', 'Spoøení:Stavební spoøení'),
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:MATÌJ STAVEBNÍ SPOØENÍ:000000-5714627502/7960:0611124459', 'Spoøení:Matìj spoøení'),
@@ -70,71 +75,75 @@ rulePatternCatSubcat = [
     ('VODAFONE CZECH.*', 'Úèty a faktury:Telefon'),
     ('WWW.O2.SK/DOBIJANIE .*CZK/ EUR', 'Úèty a faktury:Telefon'),
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:PØEVOD PROSTØEDKÙ GREENPEACE:GREENPEACE PØÍSPÌVEK.*', 'Zábava:Dobroèinnost'),
-    ('ODCHOZÍ PLATBA DO JINÉ BANKY:PØEVOD PROSTØEDKÙ GREENPEACE:000000-0201123744/0300:0000100744:0000000308', 'Zábava:Dobroèinnost'),
+    ('ODCHOZÍ PLATBA DO JINÉ BANKY:PØEVOD PROSTØEDKÙ GREENPEACE:000000-0201123744/0300:0000100744:0000000308',
+     'Zábava:Dobroèinnost'),
     ('VÝBÌR Z BANKOMATU:.*PROVEDENÍ TRANSAKCE:.*', 'Výbìr hotovosti:'),
     ('SPLÁTKA - 670100-2200593065/6210', 'Pøevod úèet-úèet:'),
     ('Splátka klienta', 'Pøevod úèet-úèet:'),
-    ('PØÍCHOZÍ PLATBA Z JINÉ BANKY:Pøevod do mBank:Ing. David Nìmec :''000000-0646562002/5500''','Pøevod úèet-úèet:'),
-    ('LIDL.* PRAHA .* CZ', 'Jídlo:Potraviny' ),
-    ('Ing. Lubos Kruta', 'Jídlo:Potraviny' ),
+    ('PØÍCHOZÍ PLATBA Z JINÉ BANKY:Pøevod do mBank:Ing. David Nìmec :''000000-0646562002/5500''', 'Pøevod úèet-úèet:'),
+    ('LIDL.* PRAHA .* CZ', 'Jídlo:Potraviny'),
+    ('Ing. Lubos Kruta', 'Jídlo:Potraviny'),
     ('ALBERT.*', 'Jídlo:Potraviny'),
     ('BENU LEKARNA 060', 'Jídlo:Potraviny'),
-    ('DM DROGERIE MARKT.*', 'Jídlo:Potraviny' ),
-    ('Penny Stefanikova 698', 'Jídlo:Potraviny' ),
-    ('Tesco Praha Arbesovo n', 'Jídlo:Potraviny' ),
+    ('DM DROGERIE MARKT.*', 'Jídlo:Potraviny'),
+    ('Penny Stefanikova 698', 'Jídlo:Potraviny'),
+    ('Tesco Praha Arbesovo n', 'Jídlo:Potraviny'),
     ('PONT THE PARK CHODOV PRAHA 4 CZ', 'Jídlo:Potraviny'),
     ('DOPRAVNI PODNIK HL. M. PRAHA 9 CZ', 'Doprava:MHD a jízdenky'),
     ('ESHOP.DPP.CZ', 'Doprava:MHD a jízdenky'),
     ('WWW.SAZKAMOBIL.CZ', 'Úèty a faktury:Telefon'),
     ('VODAFONE CZECH REPUBLI.*', 'Úèty a faktury:Telefon'),
-    ('ALBERT .* PRAHA .* CZ', 'Jídlo:Potraviny' ),
-    ('LIDL.*', 'Jídlo:Potraviny' ),
-    ('FRUITISIMO FRESH', 'Jídlo:Jídlo mimo domov' ),
-    ('PIZZERIA POMODORO', 'Jídlo:Jídlo mimo domov' ),
-    ('ODPOCIVADLO', 'Jídlo:Jídlo mimo domov' ),
-    ('LOVING HUT', 'Jídlo:Jídlo mimo domov' ),
-    ('YVES ROCHER OC CHODOV', 'Domácnost:Drogerie' ),
-    ('GOOGLE \*EA Mobile','Zábava:Poèítaèové hry'),
-    ('GOOGLE \*Google Play Ap','Zábava:Poèítaèové hry'),
-    ('PAYPAL \*SPOTIFY','Zábava:Poèítaèové hry'),
-    ('PAYPAL \*FIFACOIN','Zábava:Poèítaèové hry'),
+    ('ALBERT .* PRAHA .* CZ', 'Jídlo:Potraviny'),
+    ('LIDL.*', 'Jídlo:Potraviny'),
+    ('FRUITISIMO FRESH', 'Jídlo:Jídlo mimo domov'),
+    ('PIZZERIA POMODORO', 'Jídlo:Jídlo mimo domov'),
+    ('ODPOCIVADLO', 'Jídlo:Jídlo mimo domov'),
+    ('LOVING HUT', 'Jídlo:Jídlo mimo domov'),
+    ('YVES ROCHER OC CHODOV', 'Domácnost:Drogerie'),
+    ('GOOGLE \*EA Mobile', 'Zábava:Poèítaèové hry'),
+    ('GOOGLE \*Google Play Ap', 'Zábava:Poèítaèové hry'),
+    ('PAYPAL \*SPOTIFY', 'Zábava:Poèítaèové hry'),
+    ('PAYPAL \*FIFACOIN', 'Zábava:Poèítaèové hry'),
     ('PAYPAL \*ORIGIN.COM', 'Zábava:Poèítaèové hry'),
-    ('LEKARNA SLUNCE LISKOVI.*','Zdravotní péèe:Léky a vitamíny'),
-    ('Dr.Max Lekarna.*','Zdravotní péèe:Léky a vitamíny'),
-    ('GREEN FACTORY','Jídlo:Jídlo mimo domov'),
-    ('HOTEL U MARTINA PRAHA','Jídlo:Jídlo mimo domov'),
-    ('BEERTIME','Jídlo:Jídlo mimo domov'),
-    ('PRESTO RESTAURANT CHOD','Jídlo:Jídlo mimo domov'),
-    ('LOKAL BLOK s.r.o.','Jídlo:Jídlo mimo domov'),
-    ('MCDONALD.*','Jídlo:Potraviny'),
-    ('PONT THE PARK CHODOV','Jídlo:Potraviny'),
-    ('NESPRESSO BOUTIQUE','Jídlo:Pochutiny a káva'),
-    ('KREDIT INFO','Úèty a faktury:Bankovní poplatky'),
-    ('ZÚÈTOVÁNÍ ÚROKÙ','Úèty a faktury:Bankovní poplatky'),
+    ('LEKARNA SLUNCE LISKOVI.*', 'Zdravotní péèe:Léky a vitamíny'),
+    ('Dr.Max Lekarna.*', 'Zdravotní péèe:Léky a vitamíny'),
+    ('GREEN FACTORY', 'Jídlo:Jídlo mimo domov'),
+    ('HOTEL U MARTINA PRAHA', 'Jídlo:Jídlo mimo domov'),
+    ('BEERTIME', 'Jídlo:Jídlo mimo domov'),
+    ('PRESTO RESTAURANT CHOD', 'Jídlo:Jídlo mimo domov'),
+    ('LOKAL BLOK s.r.o.', 'Jídlo:Jídlo mimo domov'),
+    ('MCDONALD.*', 'Jídlo:Potraviny'),
+    ('PONT THE PARK CHODOV', 'Jídlo:Potraviny'),
+    ('NESPRESSO BOUTIQUE', 'Jídlo:Pochutiny a káva'),
+    ('KREDIT INFO', 'Úèty a faktury:Bankovní poplatky'),
+    ('ZÚÈTOVÁNÍ ÚROKÙ', 'Úèty a faktury:Bankovní poplatky'),
     ('PROFI AUTO CZ.*', 'Automobil:Benzín'),
     ('SHELL.*', 'Automobil:Benzín'),
-    ('COCA-COLA 1802618106','Jídlo:Pochutiny a káva'),
-    ('HOME OFFICE','Jídlo:Pochutiny a káva'),
+    ('COCA-COLA 1802618106', 'Jídlo:Pochutiny a káva'),
+    ('HOME OFFICE', 'Jídlo:Pochutiny a káva'),
     ('Home Office', 'Jídlo:Pochutiny a káva'),
-    ('DALLMAYR CSOB.*','Jídlo:Pochutiny a káva'),
-    ('DELIKOMAT .*','Jídlo:Pochutiny a káva'),
-    ('KFC .*','Jídlo:Jídlo mimo domov'),
-    ('.* MPASS VERIFY','Úèty a faktury:Bankovní poplatky'),
-    ('COOP Trhova Hradska','Jídlo:Potraviny'),
-    ('COOP DS PJ 11-098','Jídlo:Potraviny'),
-    ('LEKARNA BARRANDOV','Zdravotní péèe:Léky a vitamíny'),
-    ('CINEMA CITY.*','Zábava:Atrakce'),
-    ('PayU.CZ\*cinemacity.cz','Zábava:Atrakce'),
-    ('.*NA DOMÁCNOST .*','pøevod Anušce:'),
-    ('MUDR. RUSNAK','Zdravotní péèe:Zubaø a zubní hygiena'),
-    ('Centrum Tresnovka','Zábava:Sport')
-    ]
+    ('DALLMAYR CSOB.*', 'Jídlo:Pochutiny a káva'),
+    ('DELIKOMAT .*', 'Jídlo:Pochutiny a káva'),
+    ('KFC .*', 'Jídlo:Jídlo mimo domov'),
+    ('.* MPASS VERIFY', 'Úèty a faktury:Bankovní poplatky'),
+    ('COOP Trhova Hradska', 'Jídlo:Potraviny'),
+    ('COOP DS PJ 11-098', 'Jídlo:Potraviny'),
+    ('LEKARNA BARRANDOV', 'Zdravotní péèe:Léky a vitamíny'),
+    ('CINEMA CITY.*', 'Zábava:Atrakce'),
+    ('PayU.CZ\*cinemacity.cz', 'Zábava:Atrakce'),
+    ('.*NA DOMÁCNOST .*', 'pøevod Anušce:'),
+    ('MUDR. RUSNAK', 'Zdravotní péèe:Zubaø a zubní hygiena'),
+    ('Centrum Tresnovka', 'Zábava:Sport')
+]
+
+
 ########################## parameters end ##########################
 
 def print_data(data):
     print(data.description)
     for row_data in data:
         print(row_data)
+
 
 def test_exists(cursor, sqlPartFromWhere, name):
     s = "SELECT count(*) FROM {!s}{!r}".format(sqlPartFromWhere, name)
@@ -144,6 +153,7 @@ def test_exists(cursor, sqlPartFromWhere, name):
         if exist[0] > 0:
             return True
     return False
+
 
 def get_first_id(cursor, sqlTableName, sIdName):
     cursor.execute("SELECT max({!s}) FROM {!s}".format(sIdName, sqlTableName))
@@ -156,22 +166,28 @@ def get_first_id(cursor, sqlTableName, sIdName):
         else:
             return exist[0] + 1
 
+
 # najde ID z DB pro nazev kategorie a podkategorie
 def find_categid_subcategid(cursor, categname, subcategname):
     if not subcategname:
         data = cursor.execute("""select categid, subcategid from v_categ_subcateg where categname=?""", [categname])
     else:
-        data = cursor.execute("""select categid, subcategid from v_categ_subcateg where categname=? and subcategname=?""", (categname, subcategname))
+        data = cursor.execute(
+            """select categid, subcategid from v_categ_subcateg where categname=? and subcategname=?""",
+            (categname, subcategname))
     rows = data.fetchall()
     if len(rows) == 0:
-        print("No data found in table v_categ_subcateg " + " for categname:" + categname + " subcategname:" + subcategname)
+        print(
+            "No data found in table v_categ_subcateg " + " for categname:" + categname + " subcategname:" + subcategname)
         sys.exit(-1)
     if len(rows) == 1:
         row = rows[0]
         return row[0], row[1]
     if len(rows) > 1:
-        print("Too many rows found in table v_categ_subcateg" + " for categname:" + categname + " subcategname:" + subcategname)
+        print(
+            "Too many rows found in table v_categ_subcateg" + " for categname:" + categname + " subcategname:" + subcategname)
         sys.exit(-1)
+
 
 def set_category_by_rules(CategoryRules, curInput, curUpdate):
     print("set_category_by_rules")
@@ -185,24 +201,25 @@ def set_category_by_rules(CategoryRules, curInput, curUpdate):
             or t.CATEGID = (select c.categid from CATEGORY_V1 c where c.CATEGNAME = 'Neznámá')
          order by transdate desc
         """)
-#     print(curInput.description)
+    #     print(curInput.description)
     for row in data.fetchall():
-        r = reg(curInput, row)
+        r = Reg(curInput, row)
         iCnt += 1
         # check if rule can match
-#         print(row)
+        #         print(row)
         for rule in CategoryRules.values():
             bMatch = False
             if re.search(rule['pattern'], r.NOTES):
                 bMatch = True
             if bMatch:
                 curUpdate.execute("update CHECKINGACCOUNT_V1 set categid=?, subcategid=? where transid=?",
-                    (rule['categid'], rule['subcatid'], r.TRANSID))
+                                  (rule['categid'], rule['subcatid'], r.TRANSID))
                 if curUpdate.rowcount > 0:
                     iUpd += 1
     print("  Uncategorized rows:", iCnt)
     print("  Updated       rows:", iUpd)
     print()
+
 
 def set_transfers(curInput, curUpdate):
     print("set_transfers")
@@ -218,7 +235,7 @@ def set_transfers(curInput, curUpdate):
             order by transdate desc
         """)
     for row in data.fetchall():
-        r = reg(curInput, row)
+        r = Reg(curInput, row)
         iCnt += 1
         curUpdate.execute("""update CHECKINGACCOUNT_V1
          set transcode='Transfer',
@@ -233,7 +250,21 @@ def set_transfers(curInput, curUpdate):
     print("  Updated       rows:", iUpd)
     print()
 
-def local_stavebni_sporeni_update(curInput, curUpdate, callName, accountName):
+
+def exec_print_upd_num(curUpdate, msg_text, exec_sql):
+    curUpdate.execute(exec_sql)
+    if curUpdate.rowcount:
+        print(msg_text, curUpdate.rowcount)
+
+
+def set_payees(curUpdate):
+    exec_print_upd_num(curUpdate, "set_payees DEFAULT=1",
+                       """update CHECKINGACCOUNT_V1 
+                             set PAYEEID = 1 
+                           where PAYEEID is null or PAYEEID <> 1""")
+
+
+def local_stavebni_sporeni_update(curInput, callName, accountName):
     """
      pro všechny pohyby na úètech se stavebním spoøení nastaví kategorii
      stavební spoøení popø. Matìjovo
@@ -266,14 +297,15 @@ def local_stavebni_sporeni_update(curInput, curUpdate, callName, accountName):
     print("  Updated  to transfer rows:", iUpd)
 
 
-def set_stavebni_sporeni(CategoryRules, curInput, curUpdate):
+def set_stavebni_sporeni(curInput):
     """
      nastaví kategii a podkategorii pro pohyby z a na úèty se stavebním spoøením
     """
     print("set_stavebni_sporeni")
-    local_stavebni_sporeni_update(curInput, curUpdate, "Spoøení:Matìj spoøení", "Stavební spoøení Matìj")
-    local_stavebni_sporeni_update(curInput, curUpdate, "Spoøení:Stavební spoøení", "Stavební spoøení")
+    local_stavebni_sporeni_update(curInput, "Spoøení:Matìj spoøení", "Stavební spoøení Matìj")
+    local_stavebni_sporeni_update(curInput, "Spoøení:Stavební spoøení", "Stavební spoøení")
     print()
+
 
 def create_CategoryRules(rulePatternCatSubcat):
     # create dictionary from patterns and DB
@@ -286,19 +318,21 @@ def create_CategoryRules(rulePatternCatSubcat):
             sys.exit(-1)
         categname, subcatname = categname_subcatname.split(":")
         categid, subcatid = find_categid_subcategid(curInput, categname, subcatname)
-        row = {'pattern':pattern, 'categname':categname, 'subcategname':subcatname, 'categid':categid, 'subcatid':subcatid}
+        row = {'pattern': pattern, 'categname': categname, 'subcategname': subcatname, 'categid': categid,
+               'subcatid': subcatid}
         CategoryRules[pattern] = row
     #         print(row)
     print("CategoryRules:" + str(len(CategoryRules.items())))
     print()
     return CategoryRules
 
+
 ###  MAIN ################
 
-if socket.gethostname()=='nemecd_nbk':
+if socket.gethostname() == 'nemecd_nbk':
     sRQMoneyEmptyFile = r"..//vydajeMMEX.mmb"
 
-print("Soubor:"+sRQMoneyEmptyFile)
+print("Soubor:" + sRQMoneyEmptyFile)
 
 connInput = sqlite3.connect(sRQMoneyEmptyFile)
 curInput = connInput.cursor()
@@ -307,8 +341,9 @@ curUpdate = connInput.cursor()
 CategoryRules = create_CategoryRules(rulePatternCatSubcat)
 
 set_category_by_rules(CategoryRules, curInput, curUpdate)
-set_stavebni_sporeni(CategoryRules, curInput, curUpdate)
+set_stavebni_sporeni(curInput)
 set_transfers(curInput, curUpdate)
+set_payees(curUpdate)
 connInput.commit()
 # connInput.rollback()
 print("Done.")
