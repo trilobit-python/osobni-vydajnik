@@ -19,9 +19,8 @@ from src.readers.rb_card_reader import Raiffeisen_cards
 from src.readers.rb_sporici_ucet import Raiffeisen_sporici_ucet
 from src.sqlite.sqlalchemy_declarative import Base
 
-
-class mmx_importer():
-    def __init__(self, mmx_sqlite_file, root_dir_trans_hist):
+class MoneyManagerImporter:
+    def __init__(self, mmx_sqlite_file):
         db_file = f'sqlite:///{mmx_sqlite_file}'
         # engine = create_engine( db_file, echo=True)
         engine = create_engine(db_file)
@@ -29,20 +28,24 @@ class mmx_importer():
         Base.metadata.bind = engine
         DBSession = sessionmaker(bind=engine)
         DBSession.configure(bind=engine)
-        session = DBSession()
+        self.session = DBSession()
 
+    def import_csv_files(self, root_dir_trans_hist):
         # ----------- naèítání y CSV do DB
-        airBankReader(session, root_dir_trans_hist).read()
-        Raiffeisen_cards(session, root_dir_trans_hist).read()
-        Raiffeisen_sporici_ucet(session, root_dir_trans_hist).read()
-        Raiffeisen_bezny_ucet(session, root_dir_trans_hist).read()
-        mBank_bezny_ucet(session, root_dir_trans_hist).read()
-        mBank_podnikani_ucet(session, root_dir_trans_hist).read()
+        airBankReader(self.session, root_dir_trans_hist).read()
+        Raiffeisen_cards(self.session, root_dir_trans_hist).read()
+        Raiffeisen_sporici_ucet(self.session, root_dir_trans_hist).read()
+        Raiffeisen_bezny_ucet(self.session, root_dir_trans_hist).read()
+        mBank_bezny_ucet(self.session, root_dir_trans_hist).read()
+        mBank_podnikani_ucet(self.session, root_dir_trans_hist).read()
 
+    def set_categ_by_rules(self):
         # not exists target account now
         # Anna_ucet_ERA = AnnaUcetEra(session)
         # Anna_ucet_ERA.read()
         # TODO: volat nastavení kategorií po importu
+        print('TODO: volat nastavení kategorií po importu')
+
 
 if __name__ == '__main__':
     # parser and checker for arguments
@@ -54,4 +57,6 @@ if __name__ == '__main__':
     a = parser.parse_args()
 
     print(a.mmx_sqlite_file)
-    mmx_importer(a.mmx_sqlite_file, a.root_dir_trans_hist)
+    importer = MoneyManagerImporter(a.mmx_sqlite_file)
+    # importer.import_csv_files(a.root_dir_trans_hist)
+    importer.set_categ_by_rules()

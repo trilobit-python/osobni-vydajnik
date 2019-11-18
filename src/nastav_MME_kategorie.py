@@ -19,6 +19,7 @@ rulePatternCatSubcat = [
     ('ODCHOZÍ PLATBA DO JINÉ BANKY:PØEVOD PROSTØEDKÙ:ŠKOFIN :\'000000-0017145783/0300\':0001130887',
      'Automobil:Splátky poøízení'),
     ('Èerpání bonus prémie', 'Pøíjmy:Bonus premie'),
+    ('BONUS:BONUS ZA PRICHOZI PLATBY', 'Pøíjmy:Bonus premie'),
     ('PØÍCHOZÍ PLATBA Z MBANK:VÝPLATA:.*', 'Pøíjmy:Mzda'),
     ('PØÍCHOZÍ PLATBA Z MBANK:PØEVOD PROSTØEDKÙ:DAVID NÌMEC.*', 'Pøíjmy:Mzda'),
     ('PØÍCHOZÍ PLATBA Z JINÉ BANKY:000043-3920530227/0100:0138:0000000009', 'Pøíjmy:Mzda'),
