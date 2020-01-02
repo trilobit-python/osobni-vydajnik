@@ -171,26 +171,26 @@ class CHECKINGACCOUNTV1(Base, Serializer):
         d = Serializer.serialize(self)
         return d
 
-# class CHECKINGACCOUNTV1(Base):
-#     __tablename__ = 'CHECKINGACCOUNT_V1'
-#     __table_args__ = (
-#         Index('IDX_CHECKINGACCOUNT_ACCOUNT', 'ACCOUNTID', 'TOACCOUNTID'),
-#     )
-#
-#     TRANSID = Column(Integer, primary_key=True)
-#     ACCOUNTID = Column(Integer, nullable=False)
-#     TOACCOUNTID = Column(Integer)
-#     PAYEEID = Column(Integer, nullable=False)
-#     TRANSCODE = Column(Text, nullable=False)
-#     TRANSAMOUNT = Column(SqliteNumeric, nullable=False)
-#     STATUS = Column(Text)
-#     TRANSACTIONNUMBER = Column(Text)
-#     NOTES = Column(Text)
-#     CATEGID = Column(Integer)
-#     SUBCATEGID = Column(Integer)
-#     TRANSDATE = Column(Text, index=True)
-#     FOLLOWUPID = Column(Integer)
-#     TOTRANSAMOUNT = Column(SqliteNumeric)
+class CHECKINGACCOUNTV1(Base):
+    __tablename__ = 'CHECKINGACCOUNT_V1'
+    __table_args__ = (
+        Index('IDX_CHECKINGACCOUNT_ACCOUNT', 'ACCOUNTID', 'TOACCOUNTID'),
+    )
+
+    TRANSID = Column(Integer, primary_key=True)
+    ACCOUNTID = Column(Integer, nullable=False)
+    TOACCOUNTID = Column(Integer)
+    PAYEEID = Column(Integer, nullable=False)
+    TRANSCODE = Column(Text, nullable=False)
+    TRANSAMOUNT = Column(SqliteNumeric, nullable=False)
+    STATUS = Column(Text)
+    TRANSACTIONNUMBER = Column(Text)
+    NOTES = Column(Text)
+    CATEGID = Column(Integer)
+    SUBCATEGID = Column(Integer)
+    TRANSDATE = Column(Text, index=True)
+    FOLLOWUPID = Column(Integer)
+    TOTRANSAMOUNT = Column(SqliteNumeric)
 
 class CURRENCYFORMATSV1(Base):
     __tablename__ = 'CURRENCYFORMATS_V1'
