@@ -101,7 +101,7 @@ class SqliteDatabase(object):
                     FROM sqlite_master AS m
                     JOIN pragma_table_info(m.name) AS p
                    WHERE m.name=:tablename 
-                ORDER BY m.name, p.cid''';
+                ORDER BY m.name, p.cid'''
         param = {'tablename':tablename}
         return self.query(sql, param)
 

@@ -15,7 +15,7 @@ locale.setlocale(locale.LC_ALL, "")
 
 
 # --------------------------- pomocné DB funkce
-def getACCOUNTID(session: object, accName: object) -> object:
+def getACCOUNTID(session, accName):
     ret = session.query(ACCOUNTLISTV1.ACCOUNTID).filter(ACCOUNTLISTV1.ACCOUNTNAME == accName).scalar()
     return ret
 

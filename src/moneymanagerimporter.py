@@ -18,6 +18,7 @@ from src.readers.rb_bezny_ucet import Raiffeisen_bezny_ucet
 from src.readers.rb_card_reader import Raiffeisen_cards
 from src.readers.rb_sporici_ucet import Raiffeisen_sporici_ucet
 from src.sqlite.sqlalchemy_declarative import Base
+from src.category_setter.category_setter import CategorySetter
 
 class MoneyManagerImporter:
     def __init__(self, mmx_sqlite_file):
@@ -39,12 +40,14 @@ class MoneyManagerImporter:
         mBank_bezny_ucet(self.session, root_dir_trans_hist).read()
         mBank_podnikani_ucet(self.session, root_dir_trans_hist).read()
 
-    def set_categ_by_rules(self):
+    def set_categ_by_rules(self, full_mmx_filename):
         # not exists target account now
         # Anna_ucet_ERA = AnnaUcetEra(session)
         # Anna_ucet_ERA.read()
         # TODO: volat nastavení kategorií po importu
         print('TODO: volat nastavení kategorií po importu')
+        setter = CategorySetter
+        setter.set_categories(full_mmx_filename)
 
 
 if __name__ == '__main__':
@@ -59,4 +62,4 @@ if __name__ == '__main__':
     print(a.mmx_sqlite_file)
     importer = MoneyManagerImporter(a.mmx_sqlite_file)
     # importer.import_csv_files(a.root_dir_trans_hist)
-    importer.set_categ_by_rules()
+    importer.set_categ_by_rules(a.mmx_sqlite_file)
