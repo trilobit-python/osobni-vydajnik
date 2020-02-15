@@ -49,7 +49,7 @@ def find_categid_subcategid(cursor, categname, subcategname):
         sys.exit(-1)
     if len(rows) == 1:
         row = rows[0]
-        return row['categid'], row['categid']
+        return row['categid'], row['subcategid']
     if len(rows) > 1:
         print(
             "Too many rows found in table v_categ_subcateg" + " for categname:" + categname + " subcategname:" + subcategname)
