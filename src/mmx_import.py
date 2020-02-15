@@ -11,6 +11,7 @@ import argparse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from src.category_setter.category_setter import CategorySetter
 from src.readers.air_bank import airBankReader
 from src.readers.mBank_podnikani_ucet import mBank_podnikani_ucet
 from src.readers.mbank_bezny_ucet import mBank_bezny_ucet
@@ -18,7 +19,8 @@ from src.readers.rb_bezny_ucet import Raiffeisen_bezny_ucet
 from src.readers.rb_card_reader import Raiffeisen_cards
 from src.readers.rb_sporici_ucet import Raiffeisen_sporici_ucet
 from src.sqlite.sqlalchemy_declarative import Base
-from src.category_setter.category_setter import CategorySetter
+from src.utils.file import get_backup_filename, copy_file
+
 
 class MoneyManagerImporter:
     def __init__(self, mmx_sqlite_file):
@@ -60,6 +62,13 @@ if __name__ == '__main__':
     a = parser.parse_args()
 
     print(a.mmx_sqlite_file)
+
+    # backup before action
+    bname = get_backup_filename(a.mmx_sqlite_file)
+    print(f'Create backup file:{bname}')
+    copy_file(a.mmx_sqlite_file, bname)
+
+    # main
     importer = MoneyManagerImporter(a.mmx_sqlite_file)
-    # importer.import_csv_files(a.root_dir_trans_hist)
+    importer.import_csv_files(a.root_dir_trans_hist)
     importer.set_categ_by_rules(a.mmx_sqlite_file)

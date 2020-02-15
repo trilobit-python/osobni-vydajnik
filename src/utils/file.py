@@ -4,7 +4,10 @@ Created on 28.12.2012
 
 @author: root
 '''
-import os, re, fnmatch
+import fnmatch
+import os
+import re
+import shutil
 
 
 def str_from_file(file_name):
@@ -43,3 +46,22 @@ def find_files(dir_name, fmask):
             if re.match(includes, item):
                 ret_list.append(os.path.join(dir_name, item))
     return ret_list
+
+
+def get_backup_filename(backuped_file_name):
+    """return name of first unused backup of given file - filename.000, filename.001, ..."""
+    counter = 0
+    filename = f"{backuped_file_name}.{counter:03}.bkp"
+    while os.path.isfile(filename):
+        counter += 1
+        filename = f"{backuped_file_name}.{counter:03}.bkp"
+    return filename
+
+
+def copy_file(src, dest):
+    shutil.copy(src, dest)
+
+
+def backup_file(bck_fname):
+    backup_fname = get_backup_filename(bck_fname)
+    copy_file(bck_fname, backup_fname)
