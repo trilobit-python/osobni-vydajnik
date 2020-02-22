@@ -179,7 +179,7 @@ def create_CategoryRules(rulePatternCatSubcat, curInput):
     # create dictionary item for rule
     CategoryRules = dict()
     # naplneni slovnkiku s pravidly, dotazeni id pro kategorie a subkategorie z db
-    for pattern, categname_subcatname in rulePatternCatSubcat:
+    for pattern, categname_subcatname in rulePatternCatSubcat.items():
         if ":" not in categname_subcatname:
             print("Neni kategorie/subkategorie - nenalezen oddìlovaè[:] data:" + categname_subcatname)
             sys.exit(-1)
@@ -200,6 +200,7 @@ class CategorySetter(object):
         print(f"Soubor:{filename}")
 
         connInput = sqlite3.connect(filename)
+        # connInput.set_trace_callback(print)
         connInput.row_factory = sqlite3.Row
         curInput = connInput.cursor()
         curUpdate = connInput.cursor()

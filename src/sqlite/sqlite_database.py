@@ -34,6 +34,7 @@ class SqliteDatabase(object):
     def __init__(self, sqlite_file_name):
         # check p_database_name
         self._db_connection = sqlite3.connect(sqlite_file_name)
+        # self._db_connection.set_trace_callback(print)
         self._cursor = self._db_connection.cursor()
 
     def __del__(self):

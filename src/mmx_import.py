@@ -70,5 +70,5 @@ if __name__ == '__main__':
 
     # main
     importer = MoneyManagerImporter(a.mmx_sqlite_file)
-    importer.import_csv_files(a.root_dir_trans_hist)
+    # importer.import_csv_files(a.root_dir_trans_hist)
     importer.set_categ_by_rules(a.mmx_sqlite_file)
