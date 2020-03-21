@@ -44,4 +44,5 @@ def get_win_abs_path(path):
 
 def print_frame(pandas, rows):
     pandas.set_option('expand_frame_repr', False)
+    pandas.set_option('display.max_colwidth', -1)
     print(rows)

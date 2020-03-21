@@ -8,6 +8,7 @@
 # -------------------------------------------------------------------------------
 import argparse
 
+import pandas
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -19,19 +20,22 @@ from src.readers.rb_bezny_ucet import Raiffeisen_bezny_ucet
 from src.readers.rb_card_reader import Raiffeisen_cards
 from src.readers.rb_sporici_ucet import Raiffeisen_sporici_ucet
 from src.sqlite.sqlalchemy_declarative import Base
+from src.sqlite.sqlite_database import SqliteDatabase
+from src.utils.common import print_frame
 from src.utils.file import get_backup_filename, copy_file
 
 
 class MoneyManagerImporter:
     def __init__(self, mmx_sqlite_file):
-        db_file = f'sqlite:///{mmx_sqlite_file}'
+        self.mmx_sqlite_file = mmx_sqlite_file
+        self._db_file = f'sqlite:///{mmx_sqlite_file}'
         # engine = create_engine( db_file, echo=True)
-        engine = create_engine(db_file)
+        engine = create_engine(self._db_file)
 
         Base.metadata.bind = engine
-        DBSession = sessionmaker(bind=engine)
-        DBSession.configure(bind=engine)
-        self.session = DBSession()
+        session = sessionmaker(bind=engine)
+        session.configure(bind=engine)
+        self.session = session()
 
     def import_csv_files(self, root_dir_trans_hist):
         # ----------- naèítání y CSV do DB
@@ -42,14 +46,22 @@ class MoneyManagerImporter:
         mBank_bezny_ucet(self.session, root_dir_trans_hist).read()
         mBank_podnikani_ucet(self.session, root_dir_trans_hist).read()
 
-    def set_categ_by_rules(self, full_mmx_filename):
+    def set_categ_by_rules(self):
         # not exists target account now
         # Anna_ucet_ERA = AnnaUcetEra(session)
         # Anna_ucet_ERA.read()
         # TODO: volat nastavení kategorií po importu
         print('TODO: volat nastavení kategorií po importu')
         setter = CategorySetter
-        setter.set_categories(full_mmx_filename)
+        setter.set_categories(self.mmx_sqlite_file)
+
+    def show_rule_candidates(self):
+        db_sqlite = SqliteDatabase(self.mmx_sqlite_file)
+        result = db_sqlite.query('''SELECT NOTES, Pocet, SumCastka, MinDate, MaxDate 
+                                   from v_statistika_bez_kategorie
+                                     where pocet > 1
+                                     order by pocet desc''')
+        print_frame(pandas, result)
 
 
 if __name__ == '__main__':
@@ -70,5 +82,6 @@ if __name__ == '__main__':
 
     # main
     importer = MoneyManagerImporter(a.mmx_sqlite_file)
-    # importer.import_csv_files(a.root_dir_trans_hist)
-    importer.set_categ_by_rules(a.mmx_sqlite_file)
+    importer.import_csv_files(a.root_dir_trans_hist)
+    importer.set_categ_by_rules()
+    importer.show_rule_candidates()

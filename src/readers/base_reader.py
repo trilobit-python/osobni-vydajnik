@@ -88,5 +88,5 @@ class xReader:
             sKey = xTRANSACTIONNUMBER
             raise Exception(
                 'Many records exists[%i] ord_num_in_grp[%i] in DB for key:%s '.format(n_exists, ord_num_in_grp, sKey))
-            # kontrola pokud není jednoznaèné èíslo tranaskace (napø. kreditní karty)
+            # kontrola pokud není jednoznaèné èíslo transakce (napø. kreditní karty)
             # kontrola dle     datum, castka, ucet, id transakce
