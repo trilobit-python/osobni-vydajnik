@@ -4,212 +4,132 @@
 # Name:        nastavi kategorie a transfery v sqlite DB souboru aplikace MME MoneyManagerEx
 # -------------------------------------------------------------------------------
 
+import csv
+import os
 import re
-import sqlite3
 import sys
 
-from src.category_setter.rules_table import rulePatternCatSubcat
-from src.utils.common import Reg
+import pandas
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 
-
-def test_exists(cursor, sqlPartFromWhere, name):
-    s = "SELECT count(*) FROM {!s}{!r}".format(sqlPartFromWhere, name)
-    cursor.execute(s)
-    exist = cursor.fetchone()
-    if exist is not None:
-        if exist[0] > 0:
-            return True
-    return False
-
-
-def get_first_id(cursor, sqlTableName, sIdName):
-    cursor.execute("SELECT max({!s}) FROM {!s}".format(sIdName, sqlTableName))
-    exist = cursor.fetchone()
-    if exist is None:
-        return 1
-    else:
-        if exist[0] is None:
-            return 1
-        else:
-            return exist[0] + 1
-
-
-# najde ID z DB pro nazev kategorie a podkategorie
-def find_categid_subcategid(cursor, categname, subcategname):
-    if not subcategname:
-        data = cursor.execute("""select categid, subcategid from v_categ_subcateg where categname=?""", [categname])
-    else:
-        data = cursor.execute(
-            """select categid, subcategid from v_categ_subcateg where categname=? and subcategname=?""",
-            (categname, subcategname))
-    rows = data.fetchall()
-    if len(rows) == 0:
-        print(
-            "No data found in table v_categ_subcateg " + " for categname:" + categname + " subcategname:" + subcategname)
-        sys.exit(-1)
-    if len(rows) == 1:
-        row = rows[0]
-        return row['categid'], row['subcategid']
-    if len(rows) > 1:
-        print(
-            "Too many rows found in table v_categ_subcateg" + " for categname:" + categname + " subcategname:" + subcategname)
-        sys.exit(-1)
-
-
-def set_category_by_rules(CategoryRules, curInput, curUpdate):
-    print("set_category_by_rules")
-    # iterate candidate from DB for update
-    iUpd = 0
-    iCnt = 0
-    data = curInput.execute("""
-        select t.*
-          from CHECKINGACCOUNT_V1 t
-         where t.CATEGID is null
-            or t.CATEGID = (select c.categid from CATEGORY_V1 c where c.CATEGNAME = 'Neznámá')
-         order by transdate desc
-        """)
-    #     print(curInput.description)
-    for row in data.fetchall():
-        r = Reg(curInput, row)
-        iCnt += 1
-        # check if rule can match
-        #         print(row)
-        for rule in CategoryRules.values():
-            bMatch = False
-            if re.search(rule['pattern'], r.NOTES):
-                bMatch = True
-            if bMatch:
-                curUpdate.execute("update CHECKINGACCOUNT_V1 set categid=?, subcategid=? where transid=?",
-                                  (rule['categid'], rule['subcatid'], r.TRANSID))
-                if curUpdate.rowcount > 0:
-                    iUpd += 1
-    print("  Uncategorized rows:", iCnt)
-    print("  Updated       rows:", iUpd)
-    print()
-
-
-def set_transfers(curInput, curUpdate):
-    print("set_transfers")
-    # iterate candidate from DB for update
-    iUpd = 0
-    iCnt = 0
-
-    data = curInput.execute("""
-        select t.TRANSID, t.notes, t.TRANSCODE
-            from CHECKINGACCOUNT_V1 t
-             where t.CATEGID = (select c.categid from CATEGORY_V1 c where c.CATEGNAME = 'Výbìr hotovosti')
-              and t.transcode <> 'Transfer'
-            order by transdate desc
-        """)
-    for row in data.fetchall():
-        r = Reg(curInput, row)
-        iCnt += 1
-        curUpdate.execute("""update CHECKINGACCOUNT_V1
-         set transcode='Transfer',
-              toaccountid=(select accountid from ACCOUNTLIST_V1 a where ACCOUNTNAME = 'Hotovost'),
-              payeeid=-1,
-             subcategid=-1 ,
-             totransamount=transamount
-           where transid=""" + str(r.TRANSID))
-        iUpd += 1
-
-    print("  Uncategorized rows:", iCnt)
-    print("  Updated       rows:", iUpd)
-    print()
-
-
-def exec_print_upd_num(curUpdate, msg_text, exec_sql):
-    curUpdate.execute(exec_sql)
-    if curUpdate.rowcount:
-        print(msg_text, curUpdate.rowcount)
-
-
-def set_payees(curUpdate):
-    exec_print_upd_num(curUpdate, "set_payees DEFAULT=1",
-                       """update CHECKINGACCOUNT_V1 
-                             set PAYEEID = 1 
-                           where PAYEEID is null or PAYEEID <> 1""")
-
-
-def local_stavebni_sporeni_update(curInput, callName, accountName):
-    """
-     pro všechny pohyby na úètech se stavebním spoøení nastaví kategorii
-     stavební spoøení popø. Matìjovo
-    """
-    print("  " + callName)
-    categname, subcatname = callName.split(":")
-    categid, subcatid = find_categid_subcategid(curInput, categname, subcatname)
-    curInput.execute("""
-       UPDATE CHECKINGACCOUNT_V1
-          SET CATEGID=?, SUBCATEGID=?
-        where ACCOUNTID = (select a.ACCOUNTID from ACCOUNTLIST_V1 a where a.ACCOUNTNAME = ?)
-          AND (CATEGID<>? or SUBCATEGID<>?)
-        """, (categid, subcatid, accountName, categid, subcatid))
-    iUpd = curInput.rowcount
-    print("  Updated category rows:", iUpd)
-
-    curInput.execute("""
-       UPDATE CHECKINGACCOUNT_V1
-        SET transcode='Transfer',
-              toaccountid=(select accountid from ACCOUNTLIST_V1 a where ACCOUNTNAME = ?),
-              payeeid=-1,
-             totransamount=transamount
-        where
-          CATEGID= ?
-          AND SUBCATEGID =?
-          AND transcode not in ('Transfer')
-          AND  accountid <> (select accountid from ACCOUNTLIST_V1 a where ACCOUNTNAME = ?)
-        """, (accountName, categid, subcatid, accountName))
-    iUpd = curInput.rowcount
-    print("  Updated  to transfer rows:", iUpd)
-
-
-def set_stavebni_sporeni(curInput):
-    """
-     nastaví kategii a podkategorii pro pohyby z a na úèty se stavebním spoøením
-    """
-    print("set_stavebni_sporeni")
-    local_stavebni_sporeni_update(curInput, "Spoøení:Matìj spoøení", "Stavební spoøení Matìj")
-    local_stavebni_sporeni_update(curInput, "Spoøení:Stavební spoøení", "Stavební spoøení")
-    print()
-
-
-def create_CategoryRules(rulePatternCatSubcat, curInput):
-    # create dictionary from patterns and DB
-    # create dictionary item for rule
-    CategoryRules = dict()
-    # naplneni slovnkiku s pravidly, dotazeni id pro kategorie a subkategorie z db
-    for pattern, categname_subcatname in rulePatternCatSubcat.items():
-        if ":" not in categname_subcatname:
-            print("Neni kategorie/subkategorie - nenalezen oddìlovaè[:] data:" + categname_subcatname)
-            sys.exit(-1)
-        categname, subcatname = categname_subcatname.split(":")
-        categid, subcatid = find_categid_subcategid(curInput, categname, subcatname)
-        row = {'pattern': pattern, 'categname': categname, 'subcategname': subcatname, 'categid': categid,
-               'subcatid': subcatid}
-        CategoryRules[pattern] = row
-    #         print(row)
-    print("CategoryRules:" + str(len(CategoryRules.items())))
-    print()
-    return CategoryRules
+from src.sqlite.mmx_db_utils import getACCOUNTID
+from src.sqlite.sqlalchemy_declarative import CATEGORYV1, SUBCATEGORYV1, CHECKINGACCOUNTV1
 
 
 class CategorySetter(object):
+    def __init__(self, p_session, root_dir_trans_hist):
+        self.session = p_session
+        fname = os.path.join(root_dir_trans_hist, 'rules.csv')
+        rows = pandas.read_csv(fname, delimiter=chr(9), encoding='cp1250', quoting=csv.QUOTE_NONE)
 
-    def set_categories(filename):
-        print(f"Soubor:{filename}")
+        self.rulePatternCatSubcat = {}  # pattern, categname:subcatname
 
-        connInput = sqlite3.connect(filename)
-        # connInput.set_trace_callback(print)
-        connInput.row_factory = sqlite3.Row
-        curInput = connInput.cursor()
-        curUpdate = connInput.cursor()
+        for i, row in rows.iterrows():
+            pattern = row['pattern']
+            categ_sub = row['categname:subcatname']
+            if pattern in self.rulePatternCatSubcat:
+                print(f"Duplicitní definice pravidla:{pattern}")
+                sys.exit(-1)
+            else:
+                self.rulePatternCatSubcat[pattern] = categ_sub
 
-        CategoryRules = create_CategoryRules(rulePatternCatSubcat, curInput)
+        print(f'Naèteno {len(self.rulePatternCatSubcat)} pravidel ze souboru {fname}')
 
-        set_category_by_rules(CategoryRules, curInput, curUpdate)
-        set_stavebni_sporeni(curInput)
-        set_transfers(curInput, curUpdate)
-        set_payees(curUpdate)
-        connInput.commit()
-        print("Done.")
+    def set_categories(self):
+        CategoryRules = dict()
+        # naplneni slovnkiku s pravidly, dotazeni id pro kategorie a subkategorie z db
+        for pattern, categname_subcatname in self.rulePatternCatSubcat.items():
+            if ":" not in categname_subcatname:
+                print("Neni kategorie/subkategorie - nenalezen oddìlovaè[:] data:" + categname_subcatname)
+                sys.exit(-1)
+            categname, subcatname = categname_subcatname.split(":")
+            categid, subcatid = self.find_categid_subcategid(categname, subcatname)
+            if categid is not None:
+                row = {'pattern': pattern, 'categname': categname, 'subcategname': subcatname, 'categid': categid,
+                       'subcatid': subcatid}
+                CategoryRules[pattern] = row
+        print("CategoryRules:" + str(len(CategoryRules.items())))
+        print()
+
+        self.set_category_by_rules(CategoryRules)
+        self.set_transfers()
+
+    def nastav_prevod_dle_kategorie(self, categ_name, subcateg_name, target_acc_name):
+        """
+           pro všechny pohyby které mají nastavou kategorii-podkategorii
+           a nejsou z cílového úètu
+           a nejsou to Pøevody nastaví typ pohybu Pøevod na zadaný úèet
+        """
+        print(f"  Nastav pøevod pro kategorii: {categ_name} pod kategorii:{subcateg_name} na úèet:{target_acc_name}")
+
+        categ_id, subcat_id = self.find_categid_subcategid(categ_name, subcateg_name)
+        if categ_id is None:
+            print("    Neexistuje kategorie")
+            return
+
+        target_accid = getACCOUNTID(self.session, target_acc_name)
+        if target_accid is None:
+            print("    Neexistuje úèet")
+            return
+
+        iUpd = self.session.query(CHECKINGACCOUNTV1). \
+            filter(CHECKINGACCOUNTV1.ACCOUNTID != target_accid,
+                   CHECKINGACCOUNTV1.CATEGID == categ_id,
+                   CHECKINGACCOUNTV1.SUBCATEGID == subcateg_name,
+                   CHECKINGACCOUNTV1.TRANSCODE != 'Transfer'). \
+            update(
+            {'TRANSCODE': 'Transfer', 'TOACCOUNTID': target_accid, 'PAYEEID': -1, 'TOTRANSAMOUNT': 'TRANSAMOUNT'})
+        self.session.commit()
+        print("  Nastav pøevod pro øádkù:", iUpd)
+
+    def set_transfers(self):
+        print("set_transfers HOTOVOST")
+        self.nastav_prevod_dle_kategorie('Výbìr hotovosti', None, 'Hotovost')
+
+    def find_categid_subcategid(self, p_categname, p_subcategname):
+        """najde ID z DB pro nazev kategorie a podkategorie"""
+        try:
+            obj_categorie = self.session.query(CATEGORYV1).filter(CATEGORYV1.CATEGNAME == p_categname).one()
+        except NoResultFound:
+            return None, None
+        except MultipleResultsFound:
+            raise Exception(f'Nenalezeno více záznamù pro kategorie pro název: {p_categname}\n{obj_categorie}')
+
+        if p_subcategname == None or p_subcategname == '':
+            return obj_categorie.CATEGID, None
+
+        try:
+            obj_subcategorie = self.session. \
+                query(SUBCATEGORYV1).filter(SUBCATEGORYV1.CATEGID == obj_categorie.CATEGID,
+                                            SUBCATEGORYV1.SUBCATEGNAME == p_subcategname).one()
+        except NoResultFound:
+            return obj_categorie.CATEGID, None
+        except MultipleResultsFound:
+            raise Exception(
+                f'Nenalezeno více záznamù pro pod-kategorie pro název: {p_categname}-{p_subcategname}\n{obj_subcategorie}')
+
+        return obj_subcategorie.CATEGID, obj_subcategorie.SUBCATEGID
+
+    def set_category_by_rules(self, CategoryRules):
+        print("Set_category_by_rules")
+
+        n_unassigned, n_updated = 0, 0
+        for row in self.session.query(CHECKINGACCOUNTV1).filter(CHECKINGACCOUNTV1.CATEGID == None). \
+                order_by(CHECKINGACCOUNTV1.TRANSDATE):
+
+            n_unassigned += 1
+
+            for rule in CategoryRules.values():
+                bMatch = False
+                if re.search(rule['pattern'], row.NOTES):
+                    bMatch = True
+                if bMatch:
+                    row.CATEGID = rule['categid']
+                    row.SUBCATEGID = rule['subcatid']
+                    n_updated += 1
+
+        if n_updated:
+            self.session.commit()
+
+        print(f'OK Update:{n_updated} of {n_unassigned}')
+        print()

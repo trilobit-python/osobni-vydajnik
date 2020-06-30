@@ -1,9 +1,9 @@
 # -*- coding: UTF-8 -*-
-'''
+"""
 Created on 28.12.2012
 
 @author: root
-'''
+"""
 import fnmatch
 import os
 import re
@@ -41,10 +41,13 @@ def find_files(dir_name, fmask):
     includes = [fmask]  # for files only
     includes = r'|'.join([fnmatch.translate(x) for x in includes])
     ret_list = []
-    for item in os.listdir(dir_name):
-        if os.path.isfile(os.path.join(dir_name, item)):
-            if re.match(includes, item):
-                ret_list.append(os.path.join(dir_name, item))
+    try:
+        for item in os.listdir(dir_name):
+            if os.path.isfile(os.path.join(dir_name, item)):
+                if re.match(includes, item):
+                    ret_list.append(os.path.join(dir_name, item))
+    except (FileNotFoundError):
+        pass
     return ret_list
 
 

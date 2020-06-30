@@ -4,7 +4,7 @@
 import timeit
 import time
 
-class MyTimer():
+class MyTimer:
 
     def __init__(self):
         self.start = time.time()
@@ -42,7 +42,7 @@ def dispatch_dict(operator, x, y):
 def test_time(code_stmt):
     times = timeit.repeat(stmt='x = dispatch_if(\'mul\', 2, 8)', repeat=1,
                           number=1000000, globals=globals())
-    print(f'{code_stmt} time: {(times)}')
+    print(f'{code_stmt} time: {times}')
 
 
 if __name__ == '__main__':

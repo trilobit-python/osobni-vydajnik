@@ -42,7 +42,9 @@ def get_win_abs_path(path):
         return os.path.abspath(path)
 
 
-def print_frame(pandas, rows):
+def print_frame(pandas, rows, title: str = None):
     pandas.set_option('expand_frame_repr', False)
     pandas.set_option('display.max_colwidth', -1)
+    if title:
+        print(title)
     print(rows)

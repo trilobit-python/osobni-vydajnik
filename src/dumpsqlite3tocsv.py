@@ -12,9 +12,9 @@ import io as cStringIO
 import pandas as pd
 
 
-def dump_database_to_spreadsheets(filepath):
-    db = sqlite3.connect(filepath)
-    shortname, extension = os.path.splitext(filepath)
+def dump_database_to_spreadsheets(par_file_path):
+    db = sqlite3.connect(par_file_path)
+    shortname, extension = os.path.splitext(par_file_path)
     os.path.isdir(shortname) or os.mkdir(shortname)
     cursor = db.cursor()
     for table in list_tables(cursor):

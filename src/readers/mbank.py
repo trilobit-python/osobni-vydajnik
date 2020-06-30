@@ -5,15 +5,11 @@ from io import StringIO
 import pandas
 
 from src.readers.base_reader import xReader
-from src.sqlite.sqlalchemy_declarative import CHECKINGACCOUNTV1
 
 
 class mBank_bezny_ucet(xReader):
-    def __init__(self, session, root_dir_trans_hist):
-        xReader.__init__(self, session, 'běžný účet mBank',
-                         root_dir_trans_hist, r'mbank', 'mKonto_s_povolenym_precerpanim_00593065_*.csv')
-
-    def converter2(self, x):
+    @staticmethod
+    def converter2(x):
         # define format of datetime
         return pandas.to_datetime(x, format='%d-%m-%Y')
 
@@ -57,8 +53,6 @@ class mBank_bezny_ucet(xReader):
                                            '#Datum zaúčtování transakce': self.converter2},
                                keep_default_na=False, quoting=csv.QUOTE_ALL
                                )
-        x_strings = ['#Datum uskutečnění transakce', '#Částka transakce', '#Popis transakce']
-        rows['ord_num_in_grp'] = rows.groupby(x_strings).cumcount() + 1
         #
         for i, row in rows.iterrows():
             xTRANSDATE = row['#Datum uskutečnění transakce'].strftime('%Y-%m-%d')  # 2014 - 10 - 21
@@ -73,7 +67,6 @@ class mBank_bezny_ucet(xReader):
             xNOTES = " ".join(re.split("\s+", xNOTES, flags=re.UNICODE))
 
             xTRANSACTIONNUMBER = 'Stav:' + row['#Účetní zůstatek po transakci']
-            ord_num_in_grp = row['ord_num_in_grp']
 
             # values             Deposit /  Withdrawal
             if xTRANSAMOUNT > float(0):
@@ -81,13 +74,22 @@ class mBank_bezny_ucet(xReader):
             else:
                 xTRANSAMOUNT = abs(xTRANSAMOUNT)
                 xTRANSCODE = 'Withdrawal'
-            #
-            ret = self.session.query(CHECKINGACCOUNTV1.TRANSID).filter(
-                CHECKINGACCOUNTV1.ACCOUNTID == self.accID, CHECKINGACCOUNTV1.TRANSDATE == xTRANSDATE,
-                CHECKINGACCOUNTV1.TRANSAMOUNT == xTRANSAMOUNT,
-                CHECKINGACCOUNTV1.NOTES.like(row['#Popis transakce'] + '%')).count()
 
-            self.merge_to_DB(ord_num_in_grp, ret,
-                             xTRANSCODE=xTRANSCODE, xTRANSAMOUNT=xTRANSAMOUNT,
-                             xTRANSACTIONNUMBER=xTRANSACTIONNUMBER,
-                             xNOTES=xNOTES, xTRANSDATE=xTRANSDATE)
+            sPayee = row['#Plátce/Příjemce']
+
+            self.add_row(transcode=xTRANSCODE, transamount=xTRANSAMOUNT,
+                         transactionnumber=xTRANSACTIONNUMBER,
+                         note=xNOTES, date=xTRANSDATE, payee=sPayee)
+
+    def read(self, root_dir_trans_hist, acc_name='běžný účet mBank', dir_source='mbank',
+             file_mask='mKonto_s_povolenym_precerpanim_00593065_*.csv'):
+
+        super().read(root_dir_trans_hist, acc_name, dir_source, file_mask)
+
+
+class mBank_podnikani_ucet(mBank_bezny_ucet):
+    # -------------  funkčnost implementována v rodič. třídě
+
+    def read(self, root_dir_trans_hist, acc_name='podnikatelský účet mBank', dir_source='mbank_zivnost',
+             file_mask='mKonto_Business_15069717_*.csv'):
+        super().read(root_dir_trans_hist, acc_name, dir_source, file_mask)

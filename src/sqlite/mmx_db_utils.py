@@ -1,9 +1,9 @@
 # -*- coding: UTF-8 -*-
-'''
+"""
 Created on 28.12.2012
 
 @author: root
-'''
+"""
 import locale
 import os
 
