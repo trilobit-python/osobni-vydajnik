@@ -24,4 +24,4 @@ while spodek != vrsek:
     else:
         print('Tiskni jen písmena A nebo N')
 
-print(f'Bylo to číslo:{str(spodek)}?    uhádnuto v {pokusy}. pokusu')
+print(f'Bylo to číslo:{str(spodek)}?    Uhádnuto v {pokusy}. pokusu')

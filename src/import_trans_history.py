@@ -8,6 +8,7 @@
 # -------------------------------------------------------------------------------
 import argparse
 import os
+from datetime import datetime
 
 from src.readers.air_bank import AirBankReader, AirBankBeznyUcet, AirBankSporiciUcet
 from src.readers.mbank import mBank_bezny_ucet, mBank_podnikani_ucet
@@ -70,6 +71,15 @@ if __name__ == '__main__':
     bname = get_backup_filename( backup_file_name )
     print(f'Create backup file:{bname}')
     copy_file(a.sqlite_file, bname)
+
+    # FilePath = a.sqlite_file
+    # modifiedTime = os.path.getmtime(FilePath)
+    #
+    # timeStamp = datetime.fromtimestamp(modifiedTime).strftime("%Y-%m-%d_%H%M%S_")
+    # backup_dir = os.path.join( os.path.dirname(a.sqlite_file), 'backup')
+    # BackupName = os.path.join( backup_dir, timeStamp + os.path.basename(FilePath))
+    # # os.rename(FilePath, BackupName)
+    # copy_file(FilePath, BackupName)
 
     # main
     importer = TransHistImporter(a.application, a.sqlite_file, a.root_dir_trans_hist)

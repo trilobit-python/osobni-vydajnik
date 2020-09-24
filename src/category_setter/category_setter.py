@@ -78,7 +78,7 @@ class CategorySetter(object):
                    CHECKINGACCOUNTV1.SUBCATEGID == subcateg_name,
                    CHECKINGACCOUNTV1.TRANSCODE != 'Transfer'). \
             update(
-            {'TRANSCODE': 'Transfer', 'TOACCOUNTID': target_accid, 'PAYEEID': -1, 'TOTRANSAMOUNT': 'TRANSAMOUNT'})
+            {'TRANSCODE': 'Transfer', 'TOACCOUNTID': target_accid, 'PAYEEID': -1})
         self.session.commit()
         print("  Nastav pøevod pro øádkù:", iUpd)
 
