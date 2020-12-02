@@ -4,11 +4,11 @@ import pandas
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.category_setter.category_setter import CategorySetter
 from src.readers.base_reader import xReader
 from src.sqlite.mmx_db_utils import getACCOUNTID
 from src.sqlite.sqlalchemy_declarative import Base, CHECKINGACCOUNTV1
 from src.utils.common import print_frame
+from src.writer.category_setter import CategorySetter
 
 
 class xWriter:
@@ -22,6 +22,12 @@ class xWriter:
         session = sessionmaker(bind=self.engine)
         session.configure(bind=self.engine)
         self.session = session()
+
+        # pøíprava naètení definic úètù do DataFrame dfUcty
+        self.dfUcty = pandas.read_sql('select * from ACCOUNTLIST_V1 order by 1', self.engine)
+        self.dfUcty.set_index('ACCOUNTID', inplace=True)
+        self.dfKategorie = pandas.read_sql('select * from CATEGORY_V1 order by 1', self.engine)
+        self.dfKategorie.set_index('CATEGID', inplace=True)
 
     def set_categories(self, root_dir_trans_hist):
         setter = CategorySetter(self.session, root_dir_trans_hist)
@@ -53,6 +59,8 @@ class xWriter:
                 self.merge_to_db(row)
 
     def row_exists(self, vydaj: CHECKINGACCOUNTV1):
+        # from sqlalchemy import or_
+        # filter(or_(User.name == 'leela', User.name == 'akshay'))
         n_exists = self.session.query(CHECKINGACCOUNTV1.TRANSID) \
             .filter(CHECKINGACCOUNTV1.ACCOUNTID == vydaj.ACCOUNTID,
                     CHECKINGACCOUNTV1.TRANSDATE == vydaj.TRANSDATE,
@@ -64,6 +72,7 @@ class xWriter:
                     CHECKINGACCOUNTV1.ACCOUNTID == self.accID,
                     CHECKINGACCOUNTV1.TRANSDATE == vydaj.TRANSDATE,
                     CHECKINGACCOUNTV1.TRANSAMOUNT == vydaj.TRANSAMOUNT,
+                    CHECKINGACCOUNTV1.TRANSCODE.in_([vydaj.TRANSCODE, 'Transfer']),
                     CHECKINGACCOUNTV1.TRANSACTIONNUMBER == vydaj.TRANSACTIONNUMBER).count()
                 if n_s_poznamkou == 1:
                     n_exists = 1
@@ -74,6 +83,7 @@ class xWriter:
                     CHECKINGACCOUNTV1.ACCOUNTID == self.accID,
                     CHECKINGACCOUNTV1.TRANSDATE == vydaj.TRANSDATE,
                     CHECKINGACCOUNTV1.TRANSAMOUNT == vydaj.TRANSAMOUNT,
+                    CHECKINGACCOUNTV1.TRANSCODE.in_([vydaj.TRANSCODE, 'Transfer']),
                     CHECKINGACCOUNTV1.NOTES.like(vydaj.NOTES + '%')).count()
                 if n_s_poznamkou == 1:
                     n_exists = 1
@@ -84,6 +94,7 @@ class xWriter:
                     CHECKINGACCOUNTV1.ACCOUNTID == self.accID,
                     CHECKINGACCOUNTV1.TRANSDATE == vydaj.TRANSDATE,
                     CHECKINGACCOUNTV1.TRANSAMOUNT == vydaj.TRANSAMOUNT,
+                    CHECKINGACCOUNTV1.TRANSCODE.in_([vydaj.TRANSCODE, 'Transfer']),
                     CHECKINGACCOUNTV1.NOTES.like(vydaj.NOTES[0:39] + '%')).count()
                 if n_s_poznamkou == 1:
                     n_exists = 1
@@ -115,3 +126,67 @@ class xWriter:
             raise Exception(
                 f'Existuje {n_exists} záznamù v úètu:{self.accID}-{self.accName} pro zdrojový:{str(row)}')
             # print(f'Existuje {n_exists} záznamù v úètu:{self.accID}-{self.accName} pro zdrojový:{str(row)}')
+
+    def ComputeSuperType(self, p_transakce: CHECKINGACCOUNTV1):
+        '''Spoète Supertyp z pohybu a druhu úètu
+                 složité rozhodování jak nastavit sloupec SUPERTYPE
+            význam hodnot ve sloupci : P - pøíjem, V - výdaj, X - pøevod, I - investice
+            záleží na hodnotì a charakteru úètu napø. vklad na kreditní kartu je výdaj
+        '''
+        try:
+            if p_transakce.CATEGID:
+                TRANSFER_FLAG = self.dfKategorie.loc[p_transakce.CATEGID]['TRANSFER_FLAG']
+                if TRANSFER_FLAG == 1:
+                    return 'X'  # transakce je pøevod mezi úèty - nastaveno  kategorií
+
+            ACCOUNTTYPE = self.dfUcty.loc[p_transakce.ACCOUNTID]['ACCOUNTTYPE']
+
+            if ACCOUNTTYPE == 'Credit Card':
+                if p_transakce.TRANSCODE == 'Withdrawal':
+                    return 'V'
+                else:
+                    return 'X'
+            elif ACCOUNTTYPE == 'Checking':
+                if p_transakce.TRANSCODE == 'Withdrawal':
+                    return 'V'
+                else:
+                    return 'P'
+            elif ACCOUNTTYPE == 'Term':
+                if p_transakce.TRANSCODE == 'Withdrawal':
+                    return 'I'
+                else:
+                    return 'I'
+            elif ACCOUNTTYPE == 'Cash':
+                if p_transakce.TRANSCODE == 'Withdrawal':
+                    return 'V'
+                else:
+                    return 'X'
+            else:
+                raise Exception(f'Neznámý typ úètu:{ACCOUNTTYPE}')
+
+        except Exception as exc:
+            print(p_transakce.__dict__)
+            print(f' because:{exc}')
+
+    def NastavSuperType(self):
+        """Nastaví sloupec CHECKING_ACCOUNT_V1.SuperType
+        """
+        print(f"  Nastav SuperType pro všechny pohyby")
+
+        n_unassigned, n_updated = 0, 0
+        # for row in self.session.query(CHECKINGACCOUNTV1).filter(CHECKINGACCOUNTV1.SUPERTYPE == None). \
+        # for row in self.session.query(CHECKINGACCOUNTV1).filter(CHECKINGACCOUNTV1.TRANSID == 8456).order_by(
+        #         CHECKINGACCOUNTV1.TRANSDATE): 8456
+        for row in self.session.query(CHECKINGACCOUNTV1).order_by(CHECKINGACCOUNTV1.TRANSDATE):
+            # print(row.__dict__)
+            new_supertype = self.ComputeSuperType(row)
+            if new_supertype != row.SUPERTYPE:
+                row.SUPERTYPE = new_supertype
+                n_updated += 1
+                n_unassigned += 1
+
+        if n_updated:
+            self.session.commit()
+
+        print(f'OK Update:{n_updated} of {n_unassigned}')
+        print()

@@ -7,10 +7,11 @@
 # Copyright:   (c) P3402617
 # -------------------------------------------------------------------------------
 import argparse
+import filecmp
+import glob
 import os
-from datetime import datetime
 
-from src.readers.air_bank import AirBankReader, AirBankBeznyUcet, AirBankSporiciUcet
+from src.readers.air_bank import AirBankBeznyUcet, AirBankSporiciUcet
 from src.readers.mbank import mBank_bezny_ucet, mBank_podnikani_ucet
 from src.readers.raiffeisen import Raiffeisen_cards, Raiffeisen_sporici_ucet, Raiffeisen_bezny_ucet
 from src.utils.file import get_backup_filename, copy_file
@@ -37,6 +38,9 @@ class TransHistImporter:
 
     def show_rule_candidates(self):
         self.get_writer().show_rule_candidates()
+
+    def set_supertype(self):
+        self.get_writer().NastavSuperType()
 
     def import_csv_files(self):
         readers = [
@@ -65,25 +69,33 @@ if __name__ == '__main__':
 
     print('Vstupní parametry : ' + str(vars(a)))
 
-    # backup before action
+    # backup before action, only if different content from previous backup
     path = os.path.dirname(a.sqlite_file)
-    backup_file_name =  a.sqlite_file.replace(path, os.path.join(path, 'backup'))
-    bname = get_backup_filename( backup_file_name )
-    print(f'Create backup file:{bname}')
-    copy_file(a.sqlite_file, bname)
-
-    # FilePath = a.sqlite_file
-    # modifiedTime = os.path.getmtime(FilePath)
-    #
-    # timeStamp = datetime.fromtimestamp(modifiedTime).strftime("%Y-%m-%d_%H%M%S_")
-    # backup_dir = os.path.join( os.path.dirname(a.sqlite_file), 'backup')
-    # BackupName = os.path.join( backup_dir, timeStamp + os.path.basename(FilePath))
-    # # os.rename(FilePath, BackupName)
-    # copy_file(FilePath, BackupName)
+    backup_file_name = a.sqlite_file.replace(path, os.path.join(path, 'backup'))
+    bkp_file_pattern = backup_file_name + '.*.bkp'
+    print(bkp_file_pattern)
+    bkp_files = glob.glob(bkp_file_pattern)
+    latest_backup_file = None
+    if bkp_files:
+        latest_backup_file = max(bkp_files, key=os.path.getctime)
+    if not latest_backup_file:
+        bname = get_backup_filename(backup_file_name)
+        print(f'Create brand new backup file:{bname}')
+        copy_file(a.sqlite_file, bname)
+        # check if same content was backuped
+    elif filecmp.cmp(latest_backup_file, a.sqlite_file):
+        print(f'Used previous backup Create backup file:{latest_backup_file}')
+    else:
+        bname = get_backup_filename(backup_file_name)
+        print(f'Create backup file:{bname}')
+        copy_file(a.sqlite_file, bname)
 
     # main
     importer = TransHistImporter(a.application, a.sqlite_file, a.root_dir_trans_hist)
+    # if False:
     importer.import_csv_files()
     importer.set_categories()
     importer.show_rule_candidates()
+
+    importer.set_supertype()
     print('Done')

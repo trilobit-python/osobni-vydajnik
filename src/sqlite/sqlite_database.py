@@ -1,26 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 #
-""" Wrapper to call Oracle database
-
-    usage samples:
-
-    database = DatabaseApi(DateioDatabase.KARTON_BO_PROD, 'scripts', 'E4MMz6HZWu3l18du')
-    sql = f"select count(0), max(id) from data_batch"
-    df = database.query(sql)
-    print(df)
-
-    hled_id = df.iloc[-1]['max']
-
-    params={'id' : int(hled_id)}
-    sql = f"select * from data_batch where id > %(id)s - 5"
-    df = database.query(sql, params)
-    for index, row in df.iterrows():
-        print(index, row['id'], row['version'])
-
-    file_list = []
-    file_list.append('file1')
-    file_list.append('file2')
+""" Wrapper to call sqlite
 
 """
 
@@ -35,7 +16,7 @@ class SqliteDatabase(object):
         # check p_database_name
         conn = sqlite3.connect(sqlite_file_name)
         self._db_connection = conn
-        # self._db_connection.set_trace_callback(print)
+        self._db_connection.set_trace_callback(print)
         self._cursor = self._db_connection.cursor()
 
     def __del__(self):

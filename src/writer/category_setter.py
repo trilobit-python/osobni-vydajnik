@@ -75,16 +75,20 @@ class CategorySetter(object):
         iUpd = self.session.query(CHECKINGACCOUNTV1). \
             filter(CHECKINGACCOUNTV1.ACCOUNTID != target_accid,
                    CHECKINGACCOUNTV1.CATEGID == categ_id,
-                   CHECKINGACCOUNTV1.SUBCATEGID == subcateg_name,
+                   CHECKINGACCOUNTV1.SUBCATEGID == subcat_id,
                    CHECKINGACCOUNTV1.TRANSCODE != 'Transfer'). \
             update(
-            {'TRANSCODE': 'Transfer', 'TOACCOUNTID': target_accid, 'PAYEEID': -1})
+            {'TRANSCODE': 'Transfer', 'TOACCOUNTID': target_accid, 'PAYEEID': -1,
+             'TOTRANSAMOUNT': CHECKINGACCOUNTV1.TRANSAMOUNT})
         self.session.commit()
-        print("  Nastav pøevod pro øádkù:", iUpd)
+        print("  Nastaven pøevod pro øádkù:", iUpd)
 
     def set_transfers(self):
         print("set_transfers HOTOVOST")
         self.nastav_prevod_dle_kategorie('Výbìr hotovosti', None, 'Hotovost')
+        self.nastav_prevod_dle_kategorie('Spoøení', 'Matìj spoøení', 'Stavební spoøení Matìj')
+        self.nastav_prevod_dle_kategorie('Spoøení', 'Stavební spoøení', 'Stavební spoøení')
+        self.nastav_prevod_dle_kategorie('Spoøení', 'Penzijní spoøení', 'Penzijní spoøení')
 
     def find_categid_subcategid(self, p_categname, p_subcategname):
         """najde ID z DB pro nazev kategorie a podkategorie"""

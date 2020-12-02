@@ -69,12 +69,15 @@ class AirBankReader(xReader):
 
 class AirBankBeznyUcet(AirBankReader):
     """ funkčnost implementována v rodič. třídě """
+
     def read(self, root_dir_trans_hist, acc_name='běžný účet u Air bank', dir_source='air',
              file_mask='airbank_1330098017_*.csv'):
         super().read(root_dir_trans_hist, acc_name, dir_source, file_mask)
 
+
 class AirBankSporiciUcet(AirBankReader):
     """ funkčnost implementována v rodič. třídě """
+
     def read(self, root_dir_trans_hist, acc_name='AirBank spořící účet', dir_source='air',
              file_mask='airbank_1330098025_*.csv'):
         super().read(root_dir_trans_hist, acc_name, dir_source, file_mask)
