@@ -191,6 +191,7 @@ class CHECKINGACCOUNTV1(Base):
     TRANSDATE = Column(Text, index=True)
     FOLLOWUPID = Column(Integer)
     TOTRANSAMOUNT = Column(SqliteNumeric)
+    SUPERTYPE = Column(Text)
 
 class CURRENCYFORMATSV1(Base):
     __tablename__ = 'CURRENCYFORMATS_V1'
