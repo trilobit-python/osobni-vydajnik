@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: windows-1250 -*-
+from datetime import date
+
 import pandas
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -123,8 +125,13 @@ class xWriter:
             pass
 
         else:  # print('Divny stav existuje vice nez 1 v DB')
-            raise Exception(
-                f'Existuje {n_exists} záznamù v úètu:{self.accID}-{self.accName} pro zdrojový:{str(row)}')
+            if self.accID == 11 and new_vydaj.NOTES == 'PLATBA KARTOU:OVI STORE /HELSINKI' and \
+                    new_vydaj.TRANSDATE == '2010-05-03':
+                pass
+            #     vyjímka dva stejné pohyby v 1 den stejná èástka i poznámka historii mBank nelze rozlišit
+            else:
+                raise Exception(
+                    f'Existuje {n_exists} záznamù v úètu:{self.accID}-{self.accName} pro zdrojový:{str(row)}')
             # print(f'Existuje {n_exists} záznamù v úètu:{self.accID}-{self.accName} pro zdrojový:{str(row)}')
 
     def ComputeSuperType(self, p_transakce: CHECKINGACCOUNTV1):
