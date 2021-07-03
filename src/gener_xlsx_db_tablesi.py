@@ -99,4 +99,4 @@ def exportExcel(p_vystup_xlsx):
 #
 # root.mainloop()
 
-exportExcel(r'c:\Users\root\Documents\CSOB\Migrado\DM_migrado.xlsx')
+exportExcel(r'c:\tmp\DM_migrado.xlsx')

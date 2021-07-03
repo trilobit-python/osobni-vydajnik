@@ -1,7 +1,11 @@
 # osobni-vydajnik
-Nova generace importeru do MMEX</p>
-další a další
+Importér bankovních výpisů do programu Money Manager Ex do MMEX</p>
 
-test
+další vývoj:
+    odstranit části pro KMyMoney
+    opustit sqlalchemy
+
+
+
 
 

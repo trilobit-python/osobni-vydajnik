@@ -20,7 +20,7 @@ class mBank_bezny_ucet(xReader):
 
     def import_one_file(self, full_file_name):
         # rozparsuje soubor a ulož do DB
-        # data sample: mKonto_s_povolenym_precerpanim_00593065_180301_180518.csv
+        # data sample: 00593065_180301_180518.csv
         #
         # ;;;;;;#Počáteční zůstatek:;0,00 CZK;
         #
@@ -82,7 +82,7 @@ class mBank_bezny_ucet(xReader):
                          note=xNOTES, date=xTRANSDATE, payee=sPayee)
 
     def read(self, root_dir_trans_hist, acc_name='běžný účet mBank', dir_source='mbank',
-             file_mask='mKonto_s_povolenym_precerpanim_00593065_*.csv'):
+             file_mask='00593065_*.csv'):
 
         super().read(root_dir_trans_hist, acc_name, dir_source, file_mask)
 
