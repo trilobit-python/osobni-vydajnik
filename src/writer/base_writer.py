@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: windows-1250 -*-
-from datetime import date
+import sqlite3
+import sys
+import traceback
 
 import pandas
+import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.readers.base_reader import xReader
-from src.sqlite.mmx_db_utils import getACCOUNTID
 from src.sqlite.sqlalchemy_declarative import Base, CHECKINGACCOUNTV1
 from src.utils.common import print_frame
 from src.writer.category_setter import CategorySetter
@@ -25,14 +27,43 @@ class xWriter:
         session.configure(bind=self.engine)
         self.session = session()
 
+        try:
+            self.conn = sqlite3.connect(sqlite_file)
+            self.cur = self.conn.cursor()
+            print('OK sqlite3 connect')
+        except sqlite3.Error as er:
+            # raise ValueError(f'Failed to connect to database! {sqlite3.Error}')
+            print('SQLite error: %s' % (' '.join(er.args)))
+            print("Exception class is: ", er.__class__)
+            print('SQLite traceback: ')
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            print(traceback.format_exception(exc_type, exc_value, exc_tb))
+            raise ValueError(f'Failed to connect to database!')
+
         # pøíprava naètení definic úètù do DataFrame dfUcty
-        self.dfUcty = pandas.read_sql('select * from ACCOUNTLIST_V1 order by 1', self.engine)
+        self.dfUcty = pandas.read_sql('select * from ACCOUNTLIST_V1 order by 1', self.conn)
         self.dfUcty.set_index('ACCOUNTID', inplace=True)
-        self.dfKategorie = pandas.read_sql('select * from CATEGORY_V1 order by 1', self.engine)
+        self.dfKategorie = pandas.read_sql('select * from CATEGORY_V1 order by 1', self.conn)
         self.dfKategorie.set_index('CATEGID', inplace=True)
 
+    # def __del__(self):
+    #     del self
+    #
+    # def __enter__(self):
+    #     try:
+    #         self.conn = sqlite3.connect(self.db_file)
+    #         print('OK sqlite3 connect')
+    #     except sqlite3.Error:
+    #         raise ValueError(f'Failed to connect to database! {sqlite3.Error}')
+    #     return self
+    #
+    # def __exit__(self, exc_type, exc_val, exc_tb):
+    #     if self.conn:
+    #         self.conn.rollback()
+    #         self.conn.close()
+
     def set_categories(self, root_dir_trans_hist):
-        setter = CategorySetter(self.session, root_dir_trans_hist)
+        setter = CategorySetter(self.session, root_dir_trans_hist, self.cur)
         setter.set_categories()
 
     def show_rule_candidates(self):
@@ -46,154 +77,144 @@ class xWriter:
         print_frame(pandas, result, '\n* Kandidáti na pravidlo *')
 
     def zapis_do_db(self, reader: xReader):
-        self.reader = reader
-        self.accID = getACCOUNTID(self.session, reader.accName)
-        self.accName = reader.accName
+        df_ucet_info = pd.read_sql_query('select * from ACCOUNTLIST_V1 where ACCOUNTNAME = :name ',
+                                         self.conn, index_col=['ACCOUNTID'],
+                                         params={'name': reader.accName})
 
-        if self.accID is None:
-            return
+        if len(df_ucet_info.index):
+            # zapis DataFrame z readeru do DB
+            accountid = int(df_ucet_info.index[0])
+            df_existujici_pohyby = pd.read_sql_query('select * from CHECKINGACCOUNT_V1 where ACCOUNTID = :id',
+                                                     self.conn,
+                                                     index_col=['TRANSID'],
+                                                     params={'id': accountid}
+                                                     )
+            str_datum_posl_pohyb_na_ucte = '2000-01-01'
+            if len(df_existujici_pohyby.index):
+                str_datum_posl_pohyb_na_ucte = df_existujici_pohyby.TRANSDATE.max()
 
-        if len(self.reader):
-            # zapis DataFrame do DB
-            pandas.set_option('display.max_colwidth', 128)
-            for index, row in self.reader.get_data_frame().iterrows():
-                # print(index, row)
-                self.merge_to_db(row)
+            df_csv_radky = reader.get_data_frame()
 
-    def row_exists(self, vydaj: CHECKINGACCOUNTV1):
-        # from sqlalchemy import or_
-        # filter(or_(User.name == 'leela', User.name == 'akshay'))
-        n_exists = self.session.query(CHECKINGACCOUNTV1.TRANSID) \
-            .filter(CHECKINGACCOUNTV1.ACCOUNTID == vydaj.ACCOUNTID,
-                    CHECKINGACCOUNTV1.TRANSDATE == vydaj.TRANSDATE,
-                    CHECKINGACCOUNTV1.TRANSAMOUNT == vydaj.TRANSAMOUNT,
-                    CHECKINGACCOUNTV1.TRANSCODE.in_([vydaj.TRANSCODE, 'Transfer'])).count()
-        if n_exists > 1:
-            if len(vydaj.TRANSACTIONNUMBER) > 0:
-                n_s_poznamkou = self.session.query(CHECKINGACCOUNTV1.TRANSID).filter(
-                    CHECKINGACCOUNTV1.ACCOUNTID == self.accID,
-                    CHECKINGACCOUNTV1.TRANSDATE == vydaj.TRANSDATE,
-                    CHECKINGACCOUNTV1.TRANSAMOUNT == vydaj.TRANSAMOUNT,
-                    CHECKINGACCOUNTV1.TRANSCODE.in_([vydaj.TRANSCODE, 'Transfer']),
-                    CHECKINGACCOUNTV1.TRANSACTIONNUMBER == vydaj.TRANSACTIONNUMBER).count()
-                if n_s_poznamkou == 1:
-                    n_exists = 1
+            # odstraò øádky pøed datem posledního importu
+            df_csv_radky = df_csv_radky[df_csv_radky['Datum'] >= str_datum_posl_pohyb_na_ucte]
 
-        if n_exists > 1:
-            if len(vydaj.NOTES) > 0:
-                n_s_poznamkou = self.session.query(CHECKINGACCOUNTV1.TRANSID).filter(
-                    CHECKINGACCOUNTV1.ACCOUNTID == self.accID,
-                    CHECKINGACCOUNTV1.TRANSDATE == vydaj.TRANSDATE,
-                    CHECKINGACCOUNTV1.TRANSAMOUNT == vydaj.TRANSAMOUNT,
-                    CHECKINGACCOUNTV1.TRANSCODE.in_([vydaj.TRANSCODE, 'Transfer']),
-                    CHECKINGACCOUNTV1.NOTES.like(vydaj.NOTES + '%')).count()
-                if n_s_poznamkou == 1:
-                    n_exists = 1
+            # kopie prázdné struktury
+            nove_vkladane_radky = pd.DataFrame(data=None, columns=df_existujici_pohyby.columns,
+                                               index=df_existujici_pohyby.index)
 
-        if n_exists > 1:
-            if len(vydaj.NOTES) > 0:
-                n_s_poznamkou = self.session.query(CHECKINGACCOUNTV1.TRANSID).filter(
-                    CHECKINGACCOUNTV1.ACCOUNTID == self.accID,
-                    CHECKINGACCOUNTV1.TRANSDATE == vydaj.TRANSDATE,
-                    CHECKINGACCOUNTV1.TRANSAMOUNT == vydaj.TRANSAMOUNT,
-                    CHECKINGACCOUNTV1.TRANSCODE.in_([vydaj.TRANSCODE, 'Transfer']),
-                    CHECKINGACCOUNTV1.NOTES.like(vydaj.NOTES[0:39] + '%')).count()
-                if n_s_poznamkou == 1:
-                    n_exists = 1
+            for index, row in df_csv_radky.iterrows():
+                # najdi existující záznamy se stejnými hodnotami na stejném úètu
+                dict_values = dict(
+                    ACCOUNTID=accountid, TOACCOUNTID=-1, PAYEEID=1,
+                    TRANSCODE=row['Operace'], TRANSAMOUNT=row['Èástka'], STATUS=df_ucet_info.ACCOUNTNAME.values[0],
+                    TRANSACTIONNUMBER=row['ID transakce'], NOTES=row['Poznámka'], TRANSDATE=row['Datum'],
+                    FOLLOWUPID=-1, TOTRANSAMOUNT=0, TRANSID=None, CATEGID=None, SUBCATEGID=None, SUPERTYPE=None)
 
-        return n_exists
+                df_stejne = df_existujici_pohyby[(df_existujici_pohyby["ACCOUNTID"] == accountid)
+                                                 & (df_existujici_pohyby["TRANSDATE"] == dict_values['TRANSDATE'])
+                                                 & (df_existujici_pohyby["TRANSAMOUNT"] == dict_values['TRANSAMOUNT'])
+                                                 & ((df_existujici_pohyby["TRANSCODE"] == dict_values['TRANSCODE']) |
+                                                    df_existujici_pohyby["TRANSCODE"].str.startswith('Transfer'))]
+                #  pokud je více a existuje èíslo transakce pøidáme do filtru
+                if len(df_stejne.index) > 1 & len(str(row['ID transakce'])) > 0:
+                    df_stejne = df_stejne[
+                        (df_existujici_pohyby["TRANSACTIONNUMBER"] == row['ID transakce'])]
 
-    def merge_to_db(self, row):
-        # platce_prijemce = row['Plátce/Pøíjemce']
-        new_vydaj = CHECKINGACCOUNTV1(
-            ACCOUNTID=self.accID, TOACCOUNTID=-1, PAYEEID=1,
-            TRANSCODE=row['Operace'], TRANSAMOUNT=row['Èástka'], STATUS=self.accName,
-            TRANSACTIONNUMBER=row['ID transakce'], NOTES=row['Poznámka'], TRANSDATE=row['Datum'],
-            FOLLOWUPID=-1, TOTRANSAMOUNT=0)
+                if len(df_stejne.index) > 1 & len(row['Poznámka']) > 0:
+                    df_stejne = df_stejne[(df_existujici_pohyby["NOTES"].str.startswith(row['Poznámka']))]
 
-        n_exists = self.row_exists(new_vydaj)
-
-        if n_exists == 0:
-            text: str = 'INS date:{} amount:{} trans:{} note:{}' \
-                .format(new_vydaj.TRANSDATE, new_vydaj.TRANSAMOUNT, new_vydaj.TRANSACTIONNUMBER, new_vydaj.NOTES)
-            print(self.__class__.__name__, text)
-            self.session.add(new_vydaj)
-            self.session.flush()
-            self.session.commit()
-
-        elif n_exists == 1:  # OK existuje již právì jeden v DB            
-            pass
-
-        else:  # print('Divny stav existuje vice nez 1 v DB')
-            if self.accID == 11 and new_vydaj.NOTES == 'PLATBA KARTOU:OVI STORE /HELSINKI' and \
-                    new_vydaj.TRANSDATE == '2010-05-03':
-                pass
-            #     vyjímka dva stejné pohyby v 1 den stejná èástka i poznámka historii mBank nelze rozlišit
-            else:
-                raise Exception(
-                    f'Existuje {n_exists} záznamù v úètu:{self.accID}-{self.accName} pro zdrojový:{str(row)}')
-            # print(f'Existuje {n_exists} záznamù v úètu:{self.accID}-{self.accName} pro zdrojový:{str(row)}')
-
-    def ComputeSuperType(self, p_transakce: CHECKINGACCOUNTV1):
-        '''Spoète Supertyp z pohybu a druhu úètu
-                 složité rozhodování jak nastavit sloupec SUPERTYPE
-            význam hodnot ve sloupci : P - pøíjem, V - výdaj, X - pøevod, I - investice
-            záleží na hodnotì a charakteru úètu napø. vklad na kreditní kartu je výdaj
-        '''
-        try:
-            if p_transakce.CATEGID:
-                TRANSFER_FLAG = self.dfKategorie.loc[p_transakce.CATEGID]['TRANSFER_FLAG']
-                if TRANSFER_FLAG == 1:
-                    return 'X'  # transakce je pøevod mezi úèty - nastaveno  kategorií
-
-            ACCOUNTTYPE = self.dfUcty.loc[p_transakce.ACCOUNTID]['ACCOUNTTYPE']
-
-            if ACCOUNTTYPE == 'Credit Card':
-                if p_transakce.TRANSCODE == 'Withdrawal':
-                    return 'V'
+                if len(df_stejne.index) == 0:  # nová hodnota pro vložení
+                    print(f'Insert {str(row.to_dict())}')
+                    nove_vkladane_radky = nove_vkladane_radky.append(dict_values, ignore_index=True)
+                elif len(df_stejne.index) == 1:  # OK existuje již právì jeden v DB
+                    pass
                 else:
-                    return 'X'
-            elif ACCOUNTTYPE == 'Checking':
-                if p_transakce.TRANSCODE == 'Withdrawal':
-                    return 'V'
+                    # vyjímka nákup v automatu 2x stejný den stejná položka , nebyly èísla transakcí tehdá...
+                    if dict_values.ACCOUNTID == 11 and dict_values.NOTES == 'PLATBA KARTOU:OVI STORE /HELSINKI' and \
+                            row.TRANSDATE == '2010-05-03':
+                        #     vyjímka dva stejné pohyby v 1 den stejná èástka i poznámka historii mBank nelze rozlišit
+                        pass
+                    else:
+                        raise Exception(
+                            f'Existuje {len(df_stejne.index)} záznamù v úètu:'
+                            f'{accountid}-{df_ucet_info.ACCOUNTNAME.values[0]} pro zdrojový:{str(row)}')
+
+            if len(nove_vkladane_radky.index):
+                print(f'Celkem pro INSERT hodnot: {len(nove_vkladane_radky.index)}')
+                nove_vkladane_radky.to_sql('CHECKINGACCOUNT_V1', self.conn, if_exists='append', index=False)
+                # # vložení nových hodnot do DB
+                # sql = ''' INSERT INTO CHECKINGACCOUNT_V1
+                #                       (TRANSID, ACCOUNTID, TOACCOUNTID, PAYEEID, TRANSCODE,
+                #                        TRANSAMOUNT, STATUS, TRANSACTIONNUMBER, NOTES, CATEGID,
+                #                        SUBCATEGID, TRANSDATE, FOLLOWUPID, TOTRANSAMOUNT, SUPERTYPE)
+                #           VALUES (:TRANSID, :ACCOUNTID, :TOACCOUNTID, :PAYEEID, :TRANSCODE,
+                #                   :TRANSAMOUNT, :STATUS, :TRANSACTIONNUMBER, :NOTES, :CATEGID,
+                #                   :SUBCATEGID, :TRANSDATE, :FOLLOWUPID, :TOTRANSAMOUNT, :SUPERTYPE)'''
+                # self.cur.execute(sql, dict_values)
+                # self.conn.rollback()
+                self.conn.commit()
+                # return cur.lastrowid
+
+        def compute_super_type(self, p_transakce: CHECKINGACCOUNTV1):
+            """Spoète Supertyp z pohybu a druhu úètu
+                     složité rozhodování jak nastavit sloupec SUPERTYPE
+                význam hodnot ve sloupci : P - pøíjem, V - výdaj, X - pøevod, I - investice
+                záleží na hodnotì a charakteru úètu napø. vklad na kreditní kartu je výdaj
+            """
+            try:
+                if p_transakce.CATEGID:
+                    TRANSFER_FLAG = self.dfKategorie.loc[p_transakce.CATEGID]['TRANSFER_FLAG']
+                    if TRANSFER_FLAG == 1:
+                        return 'X'  # transakce je pøevod mezi úèty - nastaveno  kategorií
+
+                ACCOUNTTYPE = self.dfUcty.loc[p_transakce.ACCOUNTID]['ACCOUNTTYPE']
+
+                if ACCOUNTTYPE == 'Credit Card':
+                    if p_transakce.TRANSCODE == 'Withdrawal':
+                        return 'V'
+                    else:
+                        return 'X'
+                elif ACCOUNTTYPE == 'Checking':
+                    if p_transakce.TRANSCODE == 'Withdrawal':
+                        return 'V'
+                    else:
+                        return 'P'
+                elif ACCOUNTTYPE in ('Term', 'Asset'):
+                    if p_transakce.TRANSCODE == 'Withdrawal':
+                        return 'I'
+                    else:
+                        return 'I'
+                elif ACCOUNTTYPE == 'Cash':
+                    if p_transakce.TRANSCODE == 'Withdrawal':
+                        return 'V'
+                    else:
+                        return 'X'
                 else:
-                    return 'P'
-            elif ACCOUNTTYPE == 'Term':
-                if p_transakce.TRANSCODE == 'Withdrawal':
-                    return 'I'
-                else:
-                    return 'I'
-            elif ACCOUNTTYPE == 'Cash':
-                if p_transakce.TRANSCODE == 'Withdrawal':
-                    return 'V'
-                else:
-                    return 'X'
-            else:
-                raise Exception(f'Neznámý typ úètu:{ACCOUNTTYPE}')
+                    raise Exception(f'Neznámý typ úètu:{ACCOUNTTYPE}')
 
-        except Exception as exc:
-            print(p_transakce.__dict__)
-            print(f' because:{exc}')
+            except Exception as exc:
+                print(p_transakce.__dict__)
+                print(f' because:{exc}')
 
-    def NastavSuperType(self):
-        """Nastaví sloupec CHECKING_ACCOUNT_V1.SuperType
-        """
-        print(f"  Nastav SuperType pro všechny pohyby")
+        def NastavSuperType(self):
+            """Nastaví sloupec CHECKING_ACCOUNT_V1.SuperType
+            """
+            print(f"  Nastav SuperType pro všechny pohyby")
 
-        n_unassigned, n_updated = 0, 0
-        # for row in self.session.query(CHECKINGACCOUNTV1).filter(CHECKINGACCOUNTV1.SUPERTYPE == None). \
-        # for row in self.session.query(CHECKINGACCOUNTV1).filter(CHECKINGACCOUNTV1.TRANSID == 8456).order_by(
-        #         CHECKINGACCOUNTV1.TRANSDATE): 8456
-        for row in self.session.query(CHECKINGACCOUNTV1).order_by(CHECKINGACCOUNTV1.TRANSDATE):
-            # print(row.__dict__)
-            new_supertype = self.ComputeSuperType(row)
-            if new_supertype != row.SUPERTYPE:
-                row.SUPERTYPE = new_supertype
-                n_updated += 1
-                n_unassigned += 1
+            n_unassigned, n_updated = 0, 0
+            # for row in self.session.query(CHECKINGACCOUNTV1).filter(CHECKINGACCOUNTV1.SUPERTYPE == None). \
+            # for row in self.session.query(CHECKINGACCOUNTV1).filter(CHECKINGACCOUNTV1.TRANSID == 8456).order_by(
+            #         CHECKINGACCOUNTV1.TRANSDATE): 8456
+            for row in self.session.query(CHECKINGACCOUNTV1).order_by(CHECKINGACCOUNTV1.TRANSDATE):
+                # print(row.__dict__)
+                new_supertype = self.compute_super_type(row)
+                if new_supertype != row.SUPERTYPE:
+                    row.SUPERTYPE = new_supertype
+                    n_updated += 1
+                    n_unassigned += 1
 
-        if n_updated:
-            self.session.commit()
+            if n_updated:
+                self.session.commit()
 
-        print(f'OK Update:{n_updated} of {n_unassigned}')
-        print()
+            print(f'OK Update:{n_updated} of {n_unassigned}')
+            print()

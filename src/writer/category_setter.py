@@ -17,8 +17,9 @@ from src.sqlite.sqlalchemy_declarative import CATEGORYV1, SUBCATEGORYV1, CHECKIN
 
 
 class CategorySetter(object):
-    def __init__(self, p_session, root_dir_trans_hist):
+    def __init__(self, p_session, root_dir_trans_hist, p_cur):
         self.session = p_session
+        self.cur = p_cur
         fname = os.path.join(root_dir_trans_hist, 'rules.csv')
         rows = pandas.read_csv(fname, delimiter=chr(9), encoding='cp1250', quoting=csv.QUOTE_NONE)
 
@@ -67,7 +68,7 @@ class CategorySetter(object):
             print("    Neexistuje kategorie")
             return
 
-        target_accid = getACCOUNTID(self.session, target_acc_name)
+        target_accid = getACCOUNTID(self.cur, target_acc_name)
         if target_accid is None:
             print("    Neexistuje úèet")
             return

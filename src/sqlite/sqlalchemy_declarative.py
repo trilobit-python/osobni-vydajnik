@@ -344,22 +344,6 @@ class SUBCATEGORYV1(Base):
     CATEGID = Column(Integer, nullable=False, index=True)
 
 
-class TRANSLINKV1(Base):
-    __tablename__ = 'TRANSLINK_V1'
-    __table_args__ = (
-        Index('IDX_LINKRECORD', 'LINKTYPE', 'LINKRECORDID'),
-    )
-
-    TRANSLINKID = Column(Integer, primary_key=True)
-    CHECKINGACCOUNTID = Column(Integer, nullable=False, index=True)
-    LINKTYPE = Column(Text, nullable=False)
-    LINKRECORDID = Column(Integer, nullable=False)
 
 
-class USAGEV1(Base):
-    __tablename__ = 'USAGE_V1'
-
-    USAGEID = Column(Integer, primary_key=True)
-    USAGEDATE = Column(Text, nullable=False, index=True)
-    JSONCONTENT = Column(Text, nullable=False)
 

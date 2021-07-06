@@ -6,33 +6,29 @@ Created on 28.12.2012
 """
 import locale
 import os
+import sqlite3
 
 from sqlalchemy.orm import class_mapper
-
-from src.sqlite.sqlalchemy_declarative import ACCOUNTLISTV1, PAYEEV1, CATEGORYV1, SUBCATEGORYV1
 
 locale.setlocale(locale.LC_ALL, "")
 
 
+def get_scalar_result(cursor, sql, params=None):
+    cursor.execute(sql, params)
+    sqlite3.enable_callback_tracebacks(True)
+    val = cursor.fetchone()
+    sqlite3.enable_callback_tracebacks(False)
+    if val:
+        return val[0]
+    return None
+
+
 # --------------------------- pomocné DB funkce
-def getACCOUNTID(session, accName):
-    ret = session.query(ACCOUNTLISTV1.ACCOUNTID).filter(ACCOUNTLISTV1.ACCOUNTNAME == accName).scalar()
-    return ret
-
-
-def getPAYEEID(session, parName):
-    ret = session.query(PAYEEV1.PAYEEID).filter(PAYEEV1.PAYEENAME == parName).scalar()
-    return ret
-
-
-def getCATEGID(session, parName):
-    ret = session.query(CATEGORYV1.CATEGID).filter(CATEGORYV1.CATEGNAME == parName).scalar()
-    return ret
-
-
-def getSUBCATEGID(session, parName):
-    ret = session.query(SUBCATEGORYV1.SUBCATEGID).filter(SUBCATEGORYV1.SUBCATEGNAME == parName).scalar()
-    return ret
+def getACCOUNTID(cursor, accName: str):
+    # ret = session.query(ACCOUNTLISTV1.ACCOUNTID).filter(ACCOUNTLISTV1.ACCOUNTNAME == accName).scalar()
+    return get_scalar_result(cursor,
+                             "select ACCOUNTID from ACCOUNTLIST_V1 where ACCOUNTNAME = :name ",
+                             {'name': accName})
 
 
 def get_win_abs_path(argPath):
