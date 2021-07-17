@@ -3,31 +3,32 @@
 import sqlite3
 import sys
 import traceback
+from collections import Counter
 
+import numpy as np
 import pandas
 import pandas as pd
+from pandas import Series
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from src.readers.base_reader import xReader
-from src.sqlite.sqlalchemy_declarative import Base, CHECKINGACCOUNTV1
 from src.utils.common import print_frame
 from src.writer.category_setter import CategorySetter
 
 
-class xWriter:
+class Writer:
     """ Implementuje zápis do MMX databáze sqlite"""
 
     def __init__(self, sqlite_file: str):
         self.db_file = f'sqlite:///{sqlite_file}'
         # engine = create_engine( db_file, echo=True)
         self.engine = create_engine(self.db_file)
-        Base.metadata.bind = self.engine
-        session = sessionmaker(bind=self.engine)
-        session.configure(bind=self.engine)
-        self.session = session()
 
         try:
+            # Integer in python/pandas becomes BLOB (binary) in sqlite
+            sqlite3.register_adapter(np.int64, lambda val: int(val))
+            sqlite3.register_adapter(np.int32, lambda val: int(val))
+
             self.conn = sqlite3.connect(sqlite_file)
             self.cur = self.conn.cursor()
             print('OK sqlite3 connect')
@@ -45,6 +46,8 @@ class xWriter:
         self.dfUcty.set_index('ACCOUNTID', inplace=True)
         self.dfKategorie = pandas.read_sql('select * from CATEGORY_V1 order by 1', self.conn)
         self.dfKategorie.set_index('CATEGID', inplace=True)
+        self.dfPodKategorie = pandas.read_sql('select * from SUBCATEGORY_V1 order by 1', self.conn)
+        self.dfPodKategorie.set_index('SUBCATEGID', inplace=True)
 
     # def __del__(self):
     #     del self
@@ -63,7 +66,8 @@ class xWriter:
     #         self.conn.close()
 
     def set_categories(self, root_dir_trans_hist):
-        setter = CategorySetter(self.session, root_dir_trans_hist, self.cur)
+        setter = CategorySetter(root_dir_trans_hist, self.cur, self.conn, self.dfKategorie,
+                                self.dfPodKategorie)
         setter.set_categories()
 
     def show_rule_candidates(self):
@@ -73,8 +77,8 @@ class xWriter:
              where pocet > 1
              order by pocet desc
         '''
-        result = pandas.read_sql_query(sql_txt, self.engine)
-        print_frame(pandas, result, '\n* Kandidáti na pravidlo *')
+        result = pandas.read_sql_query(sql_txt, self.conn)
+        print_frame(result, '\n* Kandidáti na pravidlo *', '   *** ')
 
     def zapis_do_db(self, reader: xReader):
         df_ucet_info = pd.read_sql_query('select * from ACCOUNTLIST_V1 where ACCOUNTNAME = :name ',
@@ -100,14 +104,15 @@ class xWriter:
 
             # kopie prázdné struktury
             nove_vkladane_radky = pd.DataFrame(data=None, columns=df_existujici_pohyby.columns,
-                                               index=df_existujici_pohyby.index)
+                                               index=None)
+            nove_vkladane_radky.index.names = df_existujici_pohyby.index.names
 
             for index, row in df_csv_radky.iterrows():
                 # najdi existující záznamy se stejnımi hodnotami na stejném úètu
                 dict_values = dict(
                     ACCOUNTID=accountid, TOACCOUNTID=-1, PAYEEID=1,
                     TRANSCODE=row['Operace'], TRANSAMOUNT=row['Èástka'], STATUS=df_ucet_info.ACCOUNTNAME.values[0],
-                    TRANSACTIONNUMBER=row['ID transakce'], NOTES=row['Poznámka'], TRANSDATE=row['Datum'],
+                    TRANSACTIONNUMBER=row['ID transakce'], NOTES=row['Poznámka'].strip(), TRANSDATE=row['Datum'],
                     FOLLOWUPID=-1, TOTRANSAMOUNT=0, TRANSID=None, CATEGID=None, SUBCATEGID=None, SUPERTYPE=None)
 
                 df_stejne = df_existujici_pohyby[(df_existujici_pohyby["ACCOUNTID"] == accountid)
@@ -124,14 +129,15 @@ class xWriter:
                     df_stejne = df_stejne[(df_existujici_pohyby["NOTES"].str.startswith(row['Poznámka']))]
 
                 if len(df_stejne.index) == 0:  # nová hodnota pro vloení
-                    print(f'Insert {str(row.to_dict())}')
+                    print(f'Insert {str(dict_values)}')
                     nove_vkladane_radky = nove_vkladane_radky.append(dict_values, ignore_index=True)
                 elif len(df_stejne.index) == 1:  # OK existuje ji právì jeden v DB
                     pass
                 else:
                     # vyjímka nákup v automatu 2x stejnı den stejná poloka , nebyly èísla transakcí tehdá...
-                    if dict_values.ACCOUNTID == 11 and dict_values.NOTES == 'PLATBA KARTOU:OVI STORE /HELSINKI' and \
-                            row.TRANSDATE == '2010-05-03':
+                    if dict_values.get('ACCOUNTID', 0) == 11 \
+                            and dict_values.get('NOTES', 0) == 'PLATBA KARTOU:OVI STORE /HELSINKI' \
+                            and row.TRANSDATE == '2010-05-03':
                         #     vyjímka dva stejné pohyby v 1 den stejná èástka i poznámka historii mBank nelze rozlišit
                         pass
                     else:
@@ -142,79 +148,68 @@ class xWriter:
             if len(nove_vkladane_radky.index):
                 print(f'Celkem pro INSERT hodnot: {len(nove_vkladane_radky.index)}')
                 nove_vkladane_radky.to_sql('CHECKINGACCOUNT_V1', self.conn, if_exists='append', index=False)
-                # # vloení novıch hodnot do DB
-                # sql = ''' INSERT INTO CHECKINGACCOUNT_V1
-                #                       (TRANSID, ACCOUNTID, TOACCOUNTID, PAYEEID, TRANSCODE,
-                #                        TRANSAMOUNT, STATUS, TRANSACTIONNUMBER, NOTES, CATEGID,
-                #                        SUBCATEGID, TRANSDATE, FOLLOWUPID, TOTRANSAMOUNT, SUPERTYPE)
-                #           VALUES (:TRANSID, :ACCOUNTID, :TOACCOUNTID, :PAYEEID, :TRANSCODE,
-                #                   :TRANSAMOUNT, :STATUS, :TRANSACTIONNUMBER, :NOTES, :CATEGID,
-                #                   :SUBCATEGID, :TRANSDATE, :FOLLOWUPID, :TOTRANSAMOUNT, :SUPERTYPE)'''
-                # self.cur.execute(sql, dict_values)
-                # self.conn.rollback()
                 self.conn.commit()
-                # return cur.lastrowid
 
-        def compute_super_type(self, p_transakce: CHECKINGACCOUNTV1):
-            """Spoète Supertyp z pohybu a druhu úètu
-                     sloité rozhodování jak nastavit sloupec SUPERTYPE
-                vıznam hodnot ve sloupci : P - pøíjem, V - vıdaj, X - pøevod, I - investice
-                záleí na hodnotì a charakteru úètu napø. vklad na kreditní kartu je vıdaj
-            """
-            try:
-                if p_transakce.CATEGID:
-                    TRANSFER_FLAG = self.dfKategorie.loc[p_transakce.CATEGID]['TRANSFER_FLAG']
-                    if TRANSFER_FLAG == 1:
-                        return 'X'  # transakce je pøevod mezi úèty - nastaveno  kategorií
+    def compute_super_type(self, p_transakce: Series):
+        """Spoète Supertyp z pohybu a druhu úètu
+                 sloité rozhodování jak nastavit sloupec SUPERTYPE
+            vıznam hodnot ve sloupci : P - pøíjem, V - vıdaj, X - pøevod, I - investice
+            záleí na hodnotì a charakteru úètu napø. vklad na kreditní kartu je vıdaj
+        """
+        try:
+            hodnota_categid = p_transakce.get('CATEGID', 0)
+            if hodnota_categid > 0:
+                if self.dfKategorie.loc[p_transakce.CATEGID]['TRANSFER_FLAG'] == 1:
+                    return 'X'  # transakce je pøevod mezi úèty - nastaveno  kategorií
 
-                ACCOUNTTYPE = self.dfUcty.loc[p_transakce.ACCOUNTID]['ACCOUNTTYPE']
+            accounttype = self.dfUcty.loc[p_transakce.ACCOUNTID]['ACCOUNTTYPE']
 
-                if ACCOUNTTYPE == 'Credit Card':
-                    if p_transakce.TRANSCODE == 'Withdrawal':
-                        return 'V'
-                    else:
-                        return 'X'
-                elif ACCOUNTTYPE == 'Checking':
-                    if p_transakce.TRANSCODE == 'Withdrawal':
-                        return 'V'
-                    else:
-                        return 'P'
-                elif ACCOUNTTYPE in ('Term', 'Asset'):
-                    if p_transakce.TRANSCODE == 'Withdrawal':
-                        return 'I'
-                    else:
-                        return 'I'
-                elif ACCOUNTTYPE == 'Cash':
-                    if p_transakce.TRANSCODE == 'Withdrawal':
-                        return 'V'
-                    else:
-                        return 'X'
+            if accounttype == 'Credit Card':
+                if p_transakce.TRANSCODE == 'Withdrawal':
+                    return 'V'
                 else:
-                    raise Exception(f'Neznámı typ úètu:{ACCOUNTTYPE}')
+                    return 'X'
+            elif accounttype == 'Checking':
+                if p_transakce.TRANSCODE == 'Withdrawal':
+                    return 'V'
+                else:
+                    return 'P'
+            elif accounttype in ('Term', 'Asset'):
+                if p_transakce.TRANSCODE == 'Withdrawal':
+                    return 'I'
+                else:
+                    return 'I'
+            elif accounttype == 'Cash':
+                if p_transakce.TRANSCODE == 'Withdrawal':
+                    return 'V'
+                else:
+                    return 'X'
+            else:
+                raise Exception(f'Neznámı typ úètu:{accounttype}')
 
-            except Exception as exc:
-                print(p_transakce.__dict__)
-                print(f' because:{exc}')
+        except Exception as exc:
+            print(f'Error Serie:{p_transakce.to_string()}')
+            raise ValueError({exc})
 
-        def NastavSuperType(self):
-            """Nastaví sloupec CHECKING_ACCOUNT_V1.SuperType
-            """
-            print(f"  Nastav SuperType pro všechny pohyby")
+    def prenastav_supertype(self):
+        """
+        Nastaví sloupec CHECKING_ACCOUNT_V1.SuperType pro vèechny pohyby znovu
+        """
+        print(f"  Nastav SuperType pro všechny pohyby znovu")
+        statistika_nastaveni = Counter(updated=0, tested=0)
+        df_vsechny_pohyby = pd.read_sql('select * from CHECKINGACCOUNT_V1'
+                                        ' order by TRANSID',
+                                        self.conn, index_col=['TRANSID'])
 
-            n_unassigned, n_updated = 0, 0
-            # for row in self.session.query(CHECKINGACCOUNTV1).filter(CHECKINGACCOUNTV1.SUPERTYPE == None). \
-            # for row in self.session.query(CHECKINGACCOUNTV1).filter(CHECKINGACCOUNTV1.TRANSID == 8456).order_by(
-            #         CHECKINGACCOUNTV1.TRANSDATE): 8456
-            for row in self.session.query(CHECKINGACCOUNTV1).order_by(CHECKINGACCOUNTV1.TRANSDATE):
-                # print(row.__dict__)
-                new_supertype = self.compute_super_type(row)
-                if new_supertype != row.SUPERTYPE:
-                    row.SUPERTYPE = new_supertype
-                    n_updated += 1
-                    n_unassigned += 1
+        for transid, zaznam_pohyb in df_vsechny_pohyby.iterrows():
+            new_supertype = self.compute_super_type(zaznam_pohyb)
+            statistika_nastaveni['tested'] += 1
+            # rùzné hodnoty ale pozor na None
+            if not (new_supertype == zaznam_pohyb.SUPERTYPE):
+                self.cur.execute('UPDATE CHECKINGACCOUNT_V1 set SUPERTYPE = :SUPERTYPE where TRANSID=:TRANSID',
+                                 {'TRANSID': transid, 'SUPERTYPE': new_supertype})
+                statistika_nastaveni['updated'] += 1
 
-            if n_updated:
-                self.session.commit()
-
-            print(f'OK Update:{n_updated} of {n_unassigned}')
-            print()
+        if statistika_nastaveni['updated'] > 0:
+            self.conn.commit()
+        print(f'OK update Statisitka: {dict(statistika_nastaveni)}')

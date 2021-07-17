@@ -10,26 +10,30 @@ import argparse
 import filecmp
 import glob
 import os
-
 import sqlite3
+
+import numpy as np
 
 from src.readers.air_bank import AirBankBeznyUcet, AirBankSporiciUcet
 from src.readers.mbank import mBank_bezny_ucet, mBank_podnikani_ucet
 from src.readers.raiffeisen import Raiffeisen_cards, Raiffeisen_sporici_ucet, Raiffeisen_bezny_ucet
 from src.utils.file import get_backup_filename, copy_file
-from src.writer.base_writer import xWriter
+from src.writer.base_writer import Writer
 
 
 class TransHistImporter:
     def __init__(self, p_sqlite_file, p_root_dir_trans_hist):
         self.sqlite_file = p_sqlite_file
         self.root_dir_trans_hist = p_root_dir_trans_hist
-        self.writer = xWriter(self.sqlite_file)
+        self.writer = Writer(self.sqlite_file)
 
     def __del__(self):
         pass
 
     def __enter__(self):
+        # Integer in python/pandas becomes BLOB (binary) in sqlite
+        sqlite3.register_adapter(np.int64, lambda val: int(val))
+        sqlite3.register_adapter(np.int32, lambda val: int(val))
         try:
             self.conn = sqlite3.connect(self.sqlite_file)
         except sqlite3.Error:
@@ -40,15 +44,6 @@ class TransHistImporter:
         if self.conn:
             self.conn.rollback()
             self.conn.close()
-
-    def set_categories(self):
-        self.writer.set_categories(self.root_dir_trans_hist)
-
-    def show_rule_candidates(self):
-        self.writer.show_rule_candidates()
-
-    def set_supertype(self):
-        self.writer.NastavSuperType()
 
     def import_csv_files(self):
         readers = [
@@ -85,6 +80,13 @@ class TransHistImporter:
             print(f'Create backup file:{bname}')
             copy_file(a.sqlite_file, bname)
 
+    def main(self):
+        self.backup_before_all()
+        self.import_csv_files()
+        self.writer.set_categories(self.root_dir_trans_hist)
+        self.writer.show_rule_candidates()
+        self.writer.prenastav_supertype()
+
 
 if __name__ == '__main__':
     # argumenty pøíkazového øádku
@@ -96,10 +98,6 @@ if __name__ == '__main__':
     print('Vstupní parametry : ' + str(vars(a)))
 
     with TransHistImporter(a.sqlite_file, a.root_dir_trans_hist) as importer:
-        importer.backup_before_all()
-        importer.import_csv_files()
-        # importer.set_categories()
-        # importer.show_rule_candidates()
-        # importer.set_supertype()
+        importer.main()
 
     print('Done')

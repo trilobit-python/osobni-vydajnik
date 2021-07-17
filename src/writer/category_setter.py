@@ -8,18 +8,20 @@ import csv
 import os
 import re
 import sys
+from collections import Counter
 
 import pandas
-from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 
 from src.sqlite.mmx_db_utils import getACCOUNTID
-from src.sqlite.sqlalchemy_declarative import CATEGORYV1, SUBCATEGORYV1, CHECKINGACCOUNTV1
 
 
 class CategorySetter(object):
-    def __init__(self, p_session, root_dir_trans_hist, p_cur):
-        self.session = p_session
+    def __init__(self, root_dir_trans_hist, p_cur, p_conn, p_df_kategorie, p_df_podkategorie):
         self.cur = p_cur
+        self.conn = p_conn
+        self.dfKategorie = p_df_kategorie
+        self.dfPodKategorie = p_df_podkategorie
+
         fname = os.path.join(root_dir_trans_hist, 'rules.csv')
         rows = pandas.read_csv(fname, delimiter=chr(9), encoding='cp1250', quoting=csv.QUOTE_NONE)
 
@@ -36,8 +38,14 @@ class CategorySetter(object):
 
         print(f'Naèteno {len(self.rulePatternCatSubcat)} pravidel ze souboru {fname}')
 
+    def spust_potvrd_tiskni(self, sql_dotaz, parametry, text_aktualizace: str):
+        c = self.conn.execute(sql_dotaz, parametry)
+        if c.rowcount > 0:
+            self.conn.commit()
+            print(f"  {text_aktualizace}: {c.rowcount}")
+
     def set_categories(self):
-        CategoryRules = dict()
+        category_rules = dict()
         # naplneni slovnkiku s pravidly, dotazeni id pro kategorie a subkategorie z db
         for pattern, categname_subcatname in self.rulePatternCatSubcat.items():
             if ":" not in categname_subcatname:
@@ -48,11 +56,11 @@ class CategorySetter(object):
             if categid is not None:
                 row = {'pattern': pattern, 'categname': categname, 'subcategname': subcatname, 'categid': categid,
                        'subcatid': subcatid}
-                CategoryRules[pattern] = row
-        print("CategoryRules:" + str(len(CategoryRules.items())))
+                category_rules[pattern] = row
+        print("CategoryRules:" + str(len(category_rules.items())))
         print()
 
-        self.set_category_by_rules(CategoryRules)
+        self.set_category_by_rules(category_rules)
         self.set_transfers()
 
     def nastav_prevod_dle_kategorie(self, categ_name, subcateg_name, target_acc_name):
@@ -73,16 +81,15 @@ class CategorySetter(object):
             print("    Neexistuje úèet")
             return
 
-        iUpd = self.session.query(CHECKINGACCOUNTV1). \
-            filter(CHECKINGACCOUNTV1.ACCOUNTID != target_accid,
-                   CHECKINGACCOUNTV1.CATEGID == categ_id,
-                   CHECKINGACCOUNTV1.SUBCATEGID == subcat_id,
-                   CHECKINGACCOUNTV1.TRANSCODE != 'Transfer'). \
-            update(
-            {'TRANSCODE': 'Transfer', 'TOACCOUNTID': target_accid, 'PAYEEID': -1,
-             'TOTRANSAMOUNT': CHECKINGACCOUNTV1.TRANSAMOUNT})
-        self.session.commit()
-        print("  Nastaven pøevod pro øádkù:", iUpd)
+        sql = '''UPDATE CHECKINGACCOUNT_V1
+                    set TRANSCODE = 'Transfer', TOACCOUNTID = :target_accid, PAYEEID = -1, TOTRANSAMOUNT = TRANSAMOUNT
+                  where ACCOUNTID != :target_accid
+                    and CATEGID == :categ_id
+                    and SUBCATEGID == :subcat_id
+                    and TRANSCODE != 'Transfer'
+        '''
+        parametry = {'target_accid': target_accid, 'subcat_id': subcat_id, 'categ_id': categ_id}
+        self.spust_potvrd_tiskni(sql, parametry, 'Nastaven pøevod pro øádkù')
 
     def set_transfers(self):
         print("set_transfers HOTOVOST")
@@ -92,49 +99,45 @@ class CategorySetter(object):
         self.nastav_prevod_dle_kategorie('Spoøení', 'Penzijní spoøení', 'Penzijní spoøení')
 
     def find_categid_subcategid(self, p_categname, p_subcategname):
-        """najde ID z DB pro nazev kategorie a podkategorie"""
-        try:
-            obj_categorie = self.session.query(CATEGORYV1).filter(CATEGORYV1.CATEGNAME == p_categname).one()
-        except NoResultFound:
+        """najde ID z DB pro nazev kategorie a podkategorie
+        """
+        df_categorie = self.dfKategorie[self.dfKategorie.CATEGNAME == p_categname]
+        if df_categorie.empty:
             return None, None
-        except MultipleResultsFound:
-            raise Exception(f'Nenalezeno více záznamù pro kategorie pro název: {p_categname}\n{obj_categorie}')
+        if len(df_categorie.index) > 1:
+            raise Exception(f'Nenalezeno více záznamù pro kategorie pro název: {p_categname}')
+        categid = df_categorie.index[0]
 
-        if p_subcategname == None or p_subcategname == '':
-            return obj_categorie.CATEGID, None
+        df_podcategorie = self.dfPodKategorie[(self.dfPodKategorie.SUBCATEGNAME == p_subcategname)
+                                              & (self.dfPodKategorie.CATEGID == categid)]
 
-        try:
-            obj_subcategorie = self.session. \
-                query(SUBCATEGORYV1).filter(SUBCATEGORYV1.CATEGID == obj_categorie.CATEGID,
-                                            SUBCATEGORYV1.SUBCATEGNAME == p_subcategname).one()
-        except NoResultFound:
-            return obj_categorie.CATEGID, None
-        except MultipleResultsFound:
+        if df_podcategorie.empty:
+            return categid, None
+        if len(df_podcategorie.index) > 1:
             raise Exception(
-                f'Nenalezeno více záznamù pro pod-kategorie pro název: {p_categname}-{p_subcategname}\n{obj_subcategorie}')
+                f'Nenalezeno více záznamù pro pod-kategorie pro název: {p_categname}-{p_subcategname}')
 
-        return obj_subcategorie.CATEGID, obj_subcategorie.SUBCATEGID
+        return categid, df_podcategorie.index[0]
 
-    def set_category_by_rules(self, CategoryRules):
+    def set_category_by_rules(self, category_rules):
         print("Set_category_by_rules")
+        sql = 'select * from CHECKINGACCOUNT_V1 where CATEGID is NULL order by TRANSDATE'
+        df_pohyby = pandas.read_sql(sql, self.conn)
+        df_pohyby.set_index('TRANSID', inplace=True)
+        statistika = Counter()
 
-        n_unassigned, n_updated = 0, 0
-        for row in self.session.query(CHECKINGACCOUNTV1).filter(CHECKINGACCOUNTV1.CATEGID == None). \
-                order_by(CHECKINGACCOUNTV1.TRANSDATE):
+        for index, row in df_pohyby.iterrows():
+            statistika['celkem'] += 1
 
-            n_unassigned += 1
-
-            for rule in CategoryRules.values():
-                bMatch = False
+            for rule in category_rules.values():
                 if re.search(rule['pattern'], row.NOTES):
-                    bMatch = True
-                if bMatch:
-                    row.CATEGID = rule['categid']
-                    row.SUBCATEGID = rule['subcatid']
-                    n_updated += 1
+                    statistika['aktualizovano'] += 1
+                    sql_upd = 'update CHECKINGACCOUNT_V1 set CATEGID = :categid, SUBCATEGID = :subcatid' \
+                              ' where TRANSID = :transid'
+                    data = {'categid': rule['categid'], 'subcatid': rule['subcatid'], 'transid': index}
+                    self.cur.execute(sql_upd, data)
 
-        if n_updated:
-            self.session.commit()
+        if statistika['aktualizovano'] > 0:
+            self.conn.commit()
 
-        print(f'OK Update:{n_updated} of {n_unassigned}')
-        print()
+        print(f'OK {dict(statistika)}\n')
