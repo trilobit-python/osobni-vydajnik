@@ -18,6 +18,7 @@ from src.readers.air_bank import AirBankBeznyUcet, AirBankSporiciUcet
 from src.readers.mbank import mBank_bezny_ucet, mBank_podnikani_ucet
 from src.readers.raiffeisen import Raiffeisen_cards, Raiffeisen_sporici_ucet, Raiffeisen_bezny_ucet
 from src.utils.file import get_backup_filename, copy_file
+from src.utils.sqlite_database import SqliteDatabase
 from src.writer.base_writer import Writer
 
 
@@ -25,7 +26,8 @@ class TransHistImporter:
     def __init__(self, p_sqlite_file, p_root_dir_trans_hist):
         self.sqlite_file = p_sqlite_file
         self.root_dir_trans_hist = p_root_dir_trans_hist
-        self.writer = Writer(self.sqlite_file)
+        self.db = SqliteDatabase(p_sqlite_file)
+        self.writer = Writer(self.db)
 
     def __del__(self):
         pass
@@ -54,7 +56,6 @@ class TransHistImporter:
         ]
         for reader in readers:
             reader.read(self.root_dir_trans_hist)
-            # reader.get_data_frame().to_csv(os.path.join('d:', reader.accName + '.csv'), encoding='cp1250')
             print(reader.accName)
             self.writer.zapis_do_db(reader)
 

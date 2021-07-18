@@ -1,52 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: windows-1250 -*-
-import sqlite3
-import sys
-import traceback
 from collections import Counter
 
-import numpy as np
-import pandas
 import pandas as pd
 from pandas import Series
-from sqlalchemy import create_engine
 
 from src.readers.base_reader import xReader
 from src.utils.common import print_frame
+from src.utils.sqlite_database import SqliteDatabase
 from src.writer.category_setter import CategorySetter
 
 
 class Writer:
     """ Implementuje zápis do MMX databáze sqlite"""
 
-    def __init__(self, sqlite_file: str):
-        self.db_file = f'sqlite:///{sqlite_file}'
-        # engine = create_engine( db_file, echo=True)
-        self.engine = create_engine(self.db_file)
-
-        try:
-            # Integer in python/pandas becomes BLOB (binary) in sqlite
-            sqlite3.register_adapter(np.int64, lambda val: int(val))
-            sqlite3.register_adapter(np.int32, lambda val: int(val))
-
-            self.conn = sqlite3.connect(sqlite_file)
-            self.cur = self.conn.cursor()
-            print('OK sqlite3 connect')
-        except sqlite3.Error as er:
-            # raise ValueError(f'Failed to connect to database! {sqlite3.Error}')
-            print('SQLite error: %s' % (' '.join(er.args)))
-            print("Exception class is: ", er.__class__)
-            print('SQLite traceback: ')
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            print(traceback.format_exception(exc_type, exc_value, exc_tb))
-            raise ValueError(f'Failed to connect to database!')
-
-        # pøíprava naètení definic úètù do DataFrame dfUcty
-        self.dfUcty = pandas.read_sql('select * from ACCOUNTLIST_V1 order by 1', self.conn)
+    def __init__(self, p_db: SqliteDatabase):
+        self.db = p_db
+        # naètení nemìnìnnıch tabulek do pamìti
+        self.dfUcty = self.db.query('select * from ACCOUNTLIST_V1 order by 1')
         self.dfUcty.set_index('ACCOUNTID', inplace=True)
-        self.dfKategorie = pandas.read_sql('select * from CATEGORY_V1 order by 1', self.conn)
+        self.dfKategorie = self.db.query('select * from CATEGORY_V1 order by 1')
         self.dfKategorie.set_index('CATEGID', inplace=True)
-        self.dfPodKategorie = pandas.read_sql('select * from SUBCATEGORY_V1 order by 1', self.conn)
+        self.dfPodKategorie = self.db.query('select * from SUBCATEGORY_V1 order by 1')
         self.dfPodKategorie.set_index('SUBCATEGID', inplace=True)
 
     # def __del__(self):
@@ -66,8 +41,8 @@ class Writer:
     #         self.conn.close()
 
     def set_categories(self, root_dir_trans_hist):
-        setter = CategorySetter(root_dir_trans_hist, self.cur, self.conn, self.dfKategorie,
-                                self.dfPodKategorie)
+        setter = CategorySetter(root_dir_trans_hist, self.db, self.dfKategorie,
+                                self.dfPodKategorie, self.dfUcty)
         setter.set_categories()
 
     def show_rule_candidates(self):
@@ -77,22 +52,18 @@ class Writer:
              where pocet > 1
              order by pocet desc
         '''
-        result = pandas.read_sql_query(sql_txt, self.conn)
-        print_frame(result, '\n* Kandidáti na pravidlo *', '   *** ')
+        result = self.db.query(sql_txt)
+        print_frame(result, '\n* Kandidáti na pravidlo *', '   ')
 
     def zapis_do_db(self, reader: xReader):
-        df_ucet_info = pd.read_sql_query('select * from ACCOUNTLIST_V1 where ACCOUNTNAME = :name ',
-                                         self.conn, index_col=['ACCOUNTID'],
-                                         params={'name': reader.accName})
-
+        df_ucet_info = self.dfUcty[self.dfUcty.ACCOUNTNAME == reader.accName]
         if len(df_ucet_info.index):
             # zapis DataFrame z readeru do DB
             accountid = int(df_ucet_info.index[0])
-            df_existujici_pohyby = pd.read_sql_query('select * from CHECKINGACCOUNT_V1 where ACCOUNTID = :id',
-                                                     self.conn,
-                                                     index_col=['TRANSID'],
-                                                     params={'id': accountid}
-                                                     )
+            df_existujici_pohyby = self.db.query('select * from CHECKINGACCOUNT_V1 where ACCOUNTID = :id',
+                                                 p_params={'id': accountid})
+            df_existujici_pohyby.set_index('TRANSID', inplace=True)
+
             str_datum_posl_pohyb_na_ucte = '2000-01-01'
             if len(df_existujici_pohyby.index):
                 str_datum_posl_pohyb_na_ucte = df_existujici_pohyby.TRANSDATE.max()
@@ -147,8 +118,8 @@ class Writer:
 
             if len(nove_vkladane_radky.index):
                 print(f'Celkem pro INSERT hodnot: {len(nove_vkladane_radky.index)}')
-                nove_vkladane_radky.to_sql('CHECKINGACCOUNT_V1', self.conn, if_exists='append', index=False)
-                self.conn.commit()
+                nove_vkladane_radky.to_sql('CHECKINGACCOUNT_V1', self.db.connection(), if_exists='append', index=False)
+                self.db.commit()
 
     def compute_super_type(self, p_transakce: Series):
         """Spoète Supertyp z pohybu a druhu úètu
@@ -195,21 +166,19 @@ class Writer:
         """
         Nastaví sloupec CHECKING_ACCOUNT_V1.SuperType pro vèechny pohyby znovu
         """
-        print(f"  Nastav SuperType pro všechny pohyby znovu")
+        print(f"Nastav SuperType pro všechny pohyby znovu")
         statistika_nastaveni = Counter(updated=0, tested=0)
-        df_vsechny_pohyby = pd.read_sql('select * from CHECKINGACCOUNT_V1'
-                                        ' order by TRANSID',
-                                        self.conn, index_col=['TRANSID'])
-
+        df_vsechny_pohyby = self.db.query('select * from CHECKINGACCOUNT_V1  order by TRANSID')
+        df_vsechny_pohyby.set_index('TRANSID', inplace=True)
         for transid, zaznam_pohyb in df_vsechny_pohyby.iterrows():
             new_supertype = self.compute_super_type(zaznam_pohyb)
             statistika_nastaveni['tested'] += 1
             # rùzné hodnoty ale pozor na None
             if not (new_supertype == zaznam_pohyb.SUPERTYPE):
-                self.cur.execute('UPDATE CHECKINGACCOUNT_V1 set SUPERTYPE = :SUPERTYPE where TRANSID=:TRANSID',
-                                 {'TRANSID': transid, 'SUPERTYPE': new_supertype})
+                self.db.execute('UPDATE CHECKINGACCOUNT_V1 set SUPERTYPE = :SUPERTYPE where TRANSID=:TRANSID',
+                                {'TRANSID': transid, 'SUPERTYPE': new_supertype})
                 statistika_nastaveni['updated'] += 1
 
         if statistika_nastaveni['updated'] > 0:
-            self.conn.commit()
-        print(f'OK update Statisitka: {dict(statistika_nastaveni)}')
+            self.db.commit()
+        print(f'  OK update Statistika: {dict(statistika_nastaveni)}')

@@ -5,7 +5,6 @@ from io import StringIO
 import pandas
 
 from src.readers.base_reader import xReader
-from src.sqlite.sqlalchemy_declarative import CHECKINGACCOUNTV1
 
 
 class AnnaUcetEra(xReader):

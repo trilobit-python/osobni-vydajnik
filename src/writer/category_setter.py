@@ -12,15 +12,15 @@ from collections import Counter
 
 import pandas
 
-from src.sqlite.mmx_db_utils import getACCOUNTID
+from src.utils.sqlite_database import SqliteDatabase
 
 
 class CategorySetter(object):
-    def __init__(self, root_dir_trans_hist, p_cur, p_conn, p_df_kategorie, p_df_podkategorie):
-        self.cur = p_cur
-        self.conn = p_conn
+    def __init__(self, root_dir_trans_hist, p_db: SqliteDatabase, p_df_kategorie, p_df_podkategorie, p_df_ucty):
+        self.db = p_db
         self.dfKategorie = p_df_kategorie
         self.dfPodKategorie = p_df_podkategorie
+        self.dfUcty = p_df_ucty
 
         fname = os.path.join(root_dir_trans_hist, 'rules.csv')
         rows = pandas.read_csv(fname, delimiter=chr(9), encoding='cp1250', quoting=csv.QUOTE_NONE)
@@ -39,9 +39,9 @@ class CategorySetter(object):
         print(f'Naèteno {len(self.rulePatternCatSubcat)} pravidel ze souboru {fname}')
 
     def spust_potvrd_tiskni(self, sql_dotaz, parametry, text_aktualizace: str):
-        c = self.conn.execute(sql_dotaz, parametry)
+        c = self.db.execute(sql_dotaz, parametry)
         if c.rowcount > 0:
-            self.conn.commit()
+            self.db.commit()
             print(f"  {text_aktualizace}: {c.rowcount}")
 
     def set_categories(self):
@@ -76,7 +76,7 @@ class CategorySetter(object):
             print("    Neexistuje kategorie")
             return
 
-        target_accid = getACCOUNTID(self.cur, target_acc_name)
+        target_accid = self.dfUcty[self.dfUcty.ACCOUNTNAME == target_acc_name].index[0]
         if target_accid is None:
             print("    Neexistuje úèet")
             return
@@ -122,7 +122,7 @@ class CategorySetter(object):
     def set_category_by_rules(self, category_rules):
         print("Set_category_by_rules")
         sql = 'select * from CHECKINGACCOUNT_V1 where CATEGID is NULL order by TRANSDATE'
-        df_pohyby = pandas.read_sql(sql, self.conn)
+        df_pohyby = self.db.query(sql)
         df_pohyby.set_index('TRANSID', inplace=True)
         statistika = Counter()
 
@@ -135,9 +135,9 @@ class CategorySetter(object):
                     sql_upd = 'update CHECKINGACCOUNT_V1 set CATEGID = :categid, SUBCATEGID = :subcatid' \
                               ' where TRANSID = :transid'
                     data = {'categid': rule['categid'], 'subcatid': rule['subcatid'], 'transid': index}
-                    self.cur.execute(sql_upd, data)
+                    self.db.execute(sql_upd, data)
 
         if statistika['aktualizovano'] > 0:
-            self.conn.commit()
+            self.db.commit()
 
         print(f'OK {dict(statistika)}\n')

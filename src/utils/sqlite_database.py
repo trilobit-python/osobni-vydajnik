@@ -1,26 +1,37 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 #
-""" Wrapper to call sqlite
-
-"""
+""" Wrapper to call sqlite"""
 
 import logging
 import sqlite3
+import sys
+import traceback
 
+import numpy as np
 import pandas as pd
 
 
 class SqliteDatabase(object):
     def __init__(self, sqlite_file_name):
-        # check p_database_name
-        conn = sqlite3.connect(sqlite_file_name)
-        self._db_connection = conn
-        self._db_connection.set_trace_callback(print)
-        self._cursor = self._db_connection.cursor()
+        sqlite3.register_adapter(np.int64, lambda val: int(val))
+        sqlite3.register_adapter(np.int32, lambda val: int(val))
+        try:
+            conn = sqlite3.connect(sqlite_file_name)
+            self._db_connection = conn
+            self._db_connection.set_trace_callback(print)
+            self._cursor = self._db_connection.cursor()
+        except sqlite3.Error as er:
+            # raise ValueError(f'Failed to connect to database! {sqlite3.Error}')
+            print('SQLite error: %s' % (' '.join(er.args)))
+            print("Exception class is: ", er.__class__)
+            print('SQLite traceback: ')
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            print(traceback.format_exception(exc_type, exc_value, exc_tb))
+            raise ValueError(f'Failed to connect to database!')
 
     def __del__(self):
-        if self._db_connection is not None:
+        if self._db_connection:
             self._db_connection.close()
 
     def __enter__(self):
@@ -87,3 +98,6 @@ class SqliteDatabase(object):
                 ORDER BY m.name, p.cid'''
         param = {'tablename': tablename}
         return self.query(sql, param)
+
+    def connection(self):
+        return self._db_connection
