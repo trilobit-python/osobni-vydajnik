@@ -71,6 +71,6 @@ class AnnaUcetEra(xReader):
             #
             sPayee = row['označení operace']
 
-            self.add_row(  transcode=xTRANSCODE, transamount=xTRANSAMOUNT,
-                             transactionnumber=xTRANSACTIONNUMBER,
-                             note=xNOTES, date=xTRANSDATE, payee=sPayee)
+            self.add_row(transcode=xTRANSCODE, transamount=xTRANSAMOUNT,
+                         transactionnumber=xTRANSACTIONNUMBER,
+                         note=xNOTES, date=xTRANSDATE, payee=sPayee)

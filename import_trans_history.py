@@ -73,7 +73,7 @@ class TransHistImporter:
             bname = get_backup_filename(backup_file_name)
             print(f'Create brand new backup file:{bname}')
             copy_file(a.sqlite_file, bname)
-            # check if same content was backuped
+            # check if same content was backed
         elif filecmp.cmp(latest_backup_file, a.sqlite_file):
             print(f'Used previous backup Create backup file:{latest_backup_file}')
         else:

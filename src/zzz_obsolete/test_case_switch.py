@@ -4,6 +4,7 @@
 import timeit
 import time
 
+
 class MyTimer:
 
     def __init__(self):
@@ -18,6 +19,7 @@ class MyTimer:
         msg = 'The function took {time} seconds to complete'
         print(msg.format(time=runtime))
 
+
 def dispatch_if(operator, x, y):
     if operator == 'add':
         return x + y
@@ -29,6 +31,7 @@ def dispatch_if(operator, x, y):
         return x / y
     else:
         return None
+
 
 def dispatch_dict(operator, x, y):
     return {
@@ -51,22 +54,22 @@ if __name__ == '__main__':
     # test_time( 'dispatch_if (\'add\', 8, 2)' )
     # test_time( 'dispatch_if (\'div\', 8, 2)' )
 
-    print ('Test dispatch_if')
+    print('Test dispatch_if')
     with MyTimer():
         for i in range(0, 1000000):
-            dispatch_if ('div', i, 2)
+            dispatch_if('div', i, 2)
 
-    print ('Test dispatch_if add')
+    print('Test dispatch_if add')
     with MyTimer():
         for i in range(0, 1000000):
-            dispatch_if ('add', i, 2)
+            dispatch_if('add', i, 2)
 
-    print ('Test dispatch_dict')
+    print('Test dispatch_dict')
     with MyTimer():
         for i in range(0, 1000000):
-            dispatch_dict ('div', i, 2)
+            dispatch_dict('div', i, 2)
 
-    print ('Test dispatch_dict add')
+    print('Test dispatch_dict add')
     with MyTimer():
         for i in range(0, 1000000):
-            dispatch_dict ('add', i, 2)
+            dispatch_dict('add', i, 2)

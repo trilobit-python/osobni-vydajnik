@@ -75,7 +75,7 @@ def exif_date_time(filename):
     str_cre_date_exif = None
     # hledáme první minímální èas
     for popis in ['DateTimeOriginal', 'DatetimeDigitized']:
-    # for popis in ['DateTime', 'DateTimeOriginal', 'DatetimeDigitized']:
+        # for popis in ['DateTime', 'DateTimeOriginal', 'DatetimeDigitized']:
         if popis in exif.keys():
             hodnota = exif[popis]
             if hodnota != '0000:00:00 00:00:00':

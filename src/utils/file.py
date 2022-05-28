@@ -46,7 +46,7 @@ def find_files(dir_name, fmask):
             if os.path.isfile(os.path.join(dir_name, item)):
                 if re.match(includes, item):
                     ret_list.append(os.path.join(dir_name, item))
-    except (FileNotFoundError):
+    except FileNotFoundError:
         pass
     return ret_list
 

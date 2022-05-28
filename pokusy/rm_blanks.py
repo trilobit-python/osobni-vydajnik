@@ -12,7 +12,7 @@ import stat
 import sys
 
 
-def remove_readonly(fn, path, excinfo):
+def remove_readonly(fn, path):
     try:
         os.chmod(path, stat.S_IWRITE)
         fn(path)

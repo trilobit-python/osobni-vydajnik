@@ -7,9 +7,13 @@ Usage:
     dumpsqlite3tocsv foo.db
 """
 
-import sqlite3, csv, codecs, os, os.path
+import codecs
+import csv
 import io as cStringIO
+import os
+import os.path
 import pandas as pd
+import sqlite3
 
 
 def dump_database_to_spreadsheets(par_file_path):
@@ -27,8 +31,8 @@ def list_tables(cursor):
     cursor.execute('select name from sqlite_master')
     return [r[0] for r in cursor
             if not r[0].startswith('sqlite')
-                and not r[0].startswith('IDX')
-                and not r[0].startswith('INDEX')]            
+            and not r[0].startswith('IDX')
+            and not r[0].startswith('INDEX')]
 
 
 def dump_table_to_spreadsheet(db, tablename, sheetpath):
