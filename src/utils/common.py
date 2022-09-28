@@ -52,3 +52,12 @@ def print_frame(df: DataFrame, title: str = None, data_prefix: str = ''):
     with option_context('expand_frame_repr', False, 'display.max_colwidth', None):
         for line in df.to_string().split('\n'):
             print(f'{data_prefix}{line}')
+
+
+def spoj_seznam_retezcu(seznam_retezcu_list=[], oddelovac: str = ':', odstran_zdvojene_mezery: bool = True):
+    seznam = filter(lambda name: name.strip(), seznam_retezcu)
+    seznam = filter(lambda name: name != "\'\'", seznam)
+    vysledek = ':'.join(filter(None, seznam))
+    if odstran_zdvojene_mezery:  # remove duplicate spaces
+        vysledek = " ".join(re.split("\s+", vysledek, flags=re.UNICODE))
+    return vysledek

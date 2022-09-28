@@ -11,6 +11,7 @@ import filecmp
 import glob
 import os
 import sqlite3
+import sys
 
 import numpy as np
 
@@ -90,6 +91,12 @@ class TransHistImporter:
 
 
 if __name__ == '__main__':
+    PROJECT_ROOT = os.path.abspath(os.path.join(
+        os.path.dirname(__file__),
+        os.pardir)
+    )
+    sys.path.append(PROJECT_ROOT)
+
     # argumenty pøíkazového øádku
     parser = argparse.ArgumentParser(description='MomenyManagerEx database importer from bank files and category set')
     parser.add_argument('sqlite_file', help='path to slite DB file for MMX')

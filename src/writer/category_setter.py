@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: windows-1250 -*-
 # -------------------------------------------------------------------------------
-# Name:        nastavi kategorie a transfery v sqlite DB souboru aplikace MME MoneyManagerEx
+# Name: nastavi kategorie a transfery v sqlite DB souboru aplikace MME MoneyManagerEx
 # -------------------------------------------------------------------------------
 
 import csv
@@ -14,6 +14,7 @@ import pandas
 
 from src.utils.sqlite_database import SqliteDatabase
 
+from src.writer.base_writer import CATEGID_NEZNAMA
 
 class CategorySetter(object):
     def __init__(self, root_dir_trans_hist, p_db: SqliteDatabase, p_df_kategorie, p_df_podkategorie, p_df_ucty):
@@ -33,8 +34,12 @@ class CategorySetter(object):
             if pattern in self.rulePatternCatSubcat:
                 print(f"Duplicitní definice pravidla:{pattern}")
                 sys.exit(-1)
-            else:
+            # kontrola že je to  platný regulární výraz
+            try:
+                re.compile(row['pattern'])
                 self.rulePatternCatSubcat[pattern] = categ_sub
+            except re.error:
+                raise ValueError(f"CategorySetter - neplatny regexp:{row['pattern']}")
 
         print(f'Naèteno {len(self.rulePatternCatSubcat)} pravidel ze souboru {fname}')
 
@@ -121,13 +126,16 @@ class CategorySetter(object):
 
     def set_category_by_rules(self, category_rules):
         print("Set_category_by_rules")
-        sql = 'select * from CHECKINGACCOUNT_V1 where CATEGID is NULL order by TRANSDATE'
-        df_pohyby = self.db.query(sql)
+        df_pohyby = self.db.query(
+            f'select * from CHECKINGACCOUNT_V1 where CATEGID is NULL or CTEGID = {CATEGID_NEZNAMA} order by TRANSDATE')
         df_pohyby.set_index('TRANSID', inplace=True)
         statistika = Counter()
 
         for index, row in df_pohyby.iterrows():
             statistika['celkem'] += 1
+
+            # if '0003983815' in row.NOTES:
+            #     print(row.NOTES)
 
             for rule in category_rules.values():
                 if re.search(rule['pattern'], row.NOTES):
@@ -136,6 +144,11 @@ class CategorySetter(object):
                               ' where TRANSID = :transid'
                     data = {'categid': rule['categid'], 'subcatid': rule['subcatid'], 'transid': index}
                     self.db.execute(sql_upd, data)
+
+        # print('*' * 80)
+        # for x in category_rules.values():
+        #     if '0003983815' in x['pattern']:
+        #         print(x)
 
         if statistika['aktualizovano'] > 0:
             self.db.commit()

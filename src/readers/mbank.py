@@ -5,7 +5,7 @@ from io import StringIO
 import pandas
 
 from src.readers.base_reader import xReader
-
+from src.utils.common import spoj_seznam_retezcu
 
 class mBank_bezny_ucet(xReader):
     @staticmethod
@@ -57,14 +57,9 @@ class mBank_bezny_ucet(xReader):
         for i, row in rows.iterrows():
             xTRANSDATE = row['#Datum uskutečnění transakce'].strftime('%Y-%m-%d')  # 2014 - 10 - 21
             xTRANSAMOUNT = self.str_float(row['#Částka transakce'])
-            xStrings = [row['#Popis transakce'], row['#Zpráva pro příjemce'],
-                        row['#Plátce/Příjemce'], row['#Číslo účtu plátce/příjemce'],
-                        row['#KS'], row['#VS'], row['#SS']]
-            xStrings = filter(lambda name: name.strip(), xStrings)
-            xStrings = filter(lambda name: name != "\'\'", xStrings)
-            xNOTES = ':'.join(filter(None, xStrings))
-            # remove duplicate spaces
-            xNOTES = " ".join(re.split("\s+", xNOTES, flags=re.UNICODE))
+            xNOTES = spoj_seznam_retezcu([row['#Popis transakce'], row['#Zpráva pro příjemce'],
+                                          row['#Plátce/Příjemce'], row['#Číslo účtu plátce/příjemce'],
+                                          row['#KS'], row['#VS'], row['#SS']])
 
             xTRANSACTIONNUMBER = 'Stav:' + row['#Účetní zůstatek po transakci']
 

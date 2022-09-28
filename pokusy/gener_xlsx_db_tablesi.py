@@ -35,14 +35,6 @@ def oprav_sirku_sloupcu(ws):
             ws.column_dimensions[new_column_letter].width = new_column_length + 1
 
 
-def oprav_excel(p_xlsx_name):
-    wb = Workbook()
-    dest_filename = r"account_info.xlsx"
-
-    ws = wb.worksheets[0]
-    ws.title = "Users Account Information"
-
-
 def get_col_widths(dataframe):
     # First we find the maximum length of the index column
     idx_max = max([len(str(s)) for s in dataframe.index.values] + [len(str(dataframe.index.name))])

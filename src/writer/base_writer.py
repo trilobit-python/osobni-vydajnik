@@ -10,6 +10,7 @@ from src.utils.common import print_frame
 from src.utils.sqlite_database import SqliteDatabase
 from src.writer.category_setter import CategorySetter
 
+CATEGID_NEZNAMA = 77
 
 class Writer:
     """ Implementuje z·pis do MMX datab·ze sqlite"""
@@ -84,7 +85,7 @@ class Writer:
                     ACCOUNTID=accountid, TOACCOUNTID=-1, PAYEEID=1,
                     TRANSCODE=row['Operace'], TRANSAMOUNT=row['»·stka'], STATUS=df_ucet_info.ACCOUNTNAME.values[0],
                     TRANSACTIONNUMBER=row['ID transakce'], NOTES=row['Pozn·mka'].strip(), TRANSDATE=row['Datum'],
-                    FOLLOWUPID=-1, TOTRANSAMOUNT=0, TRANSID=None, CATEGID=None, SUBCATEGID=None, SUPERTYPE=None)
+                    FOLLOWUPID=-1, TOTRANSAMOUNT=0, TRANSID=None, CATEGID=CATEGID_NEZNAMA, SUBCATEGID=None, SUPERTYPE=None)
 
                 df_stejne = df_existujici_pohyby[(df_existujici_pohyby["ACCOUNTID"] == accountid)
                                                  & (df_existujici_pohyby["TRANSDATE"] == dict_values['TRANSDATE'])
