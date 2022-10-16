@@ -55,9 +55,9 @@ def print_frame(df: DataFrame, title: str = None, data_prefix: str = ''):
 
 
 def spoj_seznam_retezcu(seznam_retezcu_list=[], oddelovac: str = ':', odstran_zdvojene_mezery: bool = True):
-    seznam = filter(lambda name: name.strip(), seznam_retezcu)
+    seznam = filter(lambda name: name.strip(), seznam_retezcu_list)
     seznam = filter(lambda name: name != "\'\'", seznam)
-    vysledek = ':'.join(filter(None, seznam))
+    vysledek = oddelovac.join(filter(None, seznam))
     if odstran_zdvojene_mezery:  # remove duplicate spaces
         vysledek = " ".join(re.split("\s+", vysledek, flags=re.UNICODE))
     return vysledek

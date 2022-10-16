@@ -5,12 +5,11 @@ from collections import Counter
 import pandas as pd
 from pandas import Series
 
-from src.readers.base_reader import xReader
-from src.utils.common import print_frame
-from src.utils.sqlite_database import SqliteDatabase
-from src.writer.category_setter import CategorySetter
-
-CATEGID_NEZNAMA = 77
+from ..readers.base_reader import xReader
+from ..utils.common import print_frame
+from ..utils.sqlite_database import SqliteDatabase
+from .category_setter import CategorySetter
+from .konstanty import CATEGID_NEZNAMA
 
 class Writer:
     """ Implementuje zápis do MMX databáze sqlite"""

@@ -1,13 +1,13 @@
 import csv
-import re
 from io import StringIO
 
 import pandas
 
-from src.readers.base_reader import xReader
-from src.utils.common import spoj_seznam_retezcu
+from .base_reader import xReader
+from ..utils.common import spoj_seznam_retezcu
 
-class mBank_bezny_ucet(xReader):
+
+class MBankBeznyUcet(xReader):
     @staticmethod
     def converter2(x):
         # define format of datetime
@@ -82,7 +82,7 @@ class mBank_bezny_ucet(xReader):
         super().read(root_dir_trans_hist, acc_name, dir_source, file_mask)
 
 
-class mBank_podnikani_ucet(mBank_bezny_ucet):
+class mBank_podnikani_ucet(MBankBeznyUcet):
     # -------------  funkčnost implementována v rodič. třídě
 
     def read(self, root_dir_trans_hist, acc_name='podnikatelský účet mBank', dir_source='mbank_zivnost',

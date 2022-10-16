@@ -12,7 +12,7 @@ from argparse import RawTextHelpFormatter
 from collections import Counter
 from os.path import join
 
-from pokusy.ext_file_info import popis_datetime_tz, datum_vzniku_z_nazvu, ensure_dir
+from .ext_file_info import popis_datetime_tz, datum_vzniku_z_nazvu, ensure_dir
 
 # seznam podporovaných pøípon
 PODPOROVANE_PRIPONY = ['jpg', 'mp4', 'mts', 'avi', 'mov']

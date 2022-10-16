@@ -15,12 +15,12 @@ import sys
 
 import numpy as np
 
-from src.readers.air_bank import AirBankBeznyUcet, AirBankSporiciUcet
-from src.readers.mbank import mBank_bezny_ucet, mBank_podnikani_ucet
-from src.readers.raiffeisen import Raiffeisen_cards, Raiffeisen_sporici_ucet, Raiffeisen_bezny_ucet
-from src.utils.file import get_backup_filename, copy_file
-from src.utils.sqlite_database import SqliteDatabase
-from src.writer.base_writer import Writer
+from src.readers import AirBankBeznyUcet, AirBankSporiciUcet
+from src.readers import MBankBeznyUcet, mBank_podnikani_ucet
+from src.readers import Raiffeisen_cards, Raiffeisen_sporici_ucet, Raiffeisen_bezny_ucet
+from src.utils import get_backup_filename, copy_file
+from src.utils import SqliteDatabase
+from src.writer import Writer
 
 
 class TransHistImporter:
@@ -52,7 +52,7 @@ class TransHistImporter:
         readers = [
             # AnnaUcetEra(),
             AirBankBeznyUcet(), AirBankSporiciUcet(),
-            mBank_bezny_ucet(), mBank_podnikani_ucet(),
+            MBankBeznyUcet(), mBank_podnikani_ucet(),
             Raiffeisen_cards(), Raiffeisen_sporici_ucet(), Raiffeisen_bezny_ucet()
         ]
         for reader in readers:

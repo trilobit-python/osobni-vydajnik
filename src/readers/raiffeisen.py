@@ -2,7 +2,7 @@ import csv
 
 import pandas
 
-from src.readers.base_reader import xReader
+from .base_reader import xReader
 
 
 class Raiffeisen_sporici_ucet(xReader):

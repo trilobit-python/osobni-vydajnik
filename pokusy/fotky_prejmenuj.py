@@ -12,7 +12,7 @@ import textwrap
 from argparse import RawTextHelpFormatter
 from collections import Counter
 
-from pokusy.ext_file_info import datum_vytvoreni_z_metadat, popis_datetime_tz, datum_vzniku_z_nazvu, \
+from .ext_file_info import datum_vytvoreni_z_metadat, popis_datetime_tz, datum_vzniku_z_nazvu, \
     get_file_time_info, set_mtime
 
 # seznam podporovaných pøípon

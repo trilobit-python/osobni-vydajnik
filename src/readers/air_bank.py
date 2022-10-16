@@ -1,6 +1,6 @@
 import pandas
 
-from src.readers.base_reader import xReader
+from .base_reader import xReader
 
 
 class AirBankReader(xReader):
@@ -41,30 +41,30 @@ class AirBankReader(xReader):
                                converters={'Datum provedení': self.converter2}, keep_default_na=False)
 
         for i, row in rows.iterrows():
-            xTRANSDATE = row['Datum provedení'].strftime('%Y-%m-%d')
-            xTRANSAMOUNT = row['Částka v měně účtu']
-            xPoplatek = row['Poplatek v měně účtu']
-            if xPoplatek != '':
-                nPoplatek = float(xPoplatek.replace(',', '.'))
-                xTRANSAMOUNT = xTRANSAMOUNT + nPoplatek
-            xTRANSACTIONNUMBER = row['Referenční číslo']
-            xNOTES = row['Poznámka k úhradě'].strip()
-            if xNOTES == '':
-                xNOTES = row['Zpráva pro příjemce'].strip()
-            if xNOTES == '':
-                xNOTES = row['Název účtu protistrany'].strip()
+            x_transdate = row['Datum provedení'].strftime('%Y-%m-%d')
+            x_transamount = row['Částka v měně účtu']
+            x_poplatek = row['Poplatek v měně účtu']
+            if x_poplatek != '':
+                n_poplatek = float(x_poplatek.replace(',', '.'))
+                x_transamount = x_transamount + n_poplatek
+            x_transactionnumber = row['Referenční číslo']
+            x_notes = row['Poznámka k úhradě'].strip()
+            if x_notes == '':
+                x_notes = row['Zpráva pro příjemce'].strip()
+            if x_notes == '':
+                x_notes = row['Název účtu protistrany'].strip()
             # values             Deposit /  Withdrawal
-            if xTRANSAMOUNT > float(0):
-                xTRANSCODE = 'Deposit'
+            if x_transamount > float(0):
+                x_transcode = 'Deposit'
             else:
-                xTRANSAMOUNT = abs(xTRANSAMOUNT)
-                xTRANSCODE = 'Withdrawal'
+                x_transamount = abs(x_transamount)
+                x_transcode = 'Withdrawal'
 
-            sPayee = row['Typ úhrady']
+            payee = row['Typ úhrady']
 
-            self.add_row(transcode=xTRANSCODE, transamount=xTRANSAMOUNT,
-                         transactionnumber=xTRANSACTIONNUMBER,
-                         note=xNOTES, date=xTRANSDATE, payee=sPayee)
+            self.add_row(transcode=x_transcode, transamount=x_transamount,
+                         transactionnumber=x_transactionnumber,
+                         note=x_notes, date=x_transdate, payee=payee)
 
 
 class AirBankBeznyUcet(AirBankReader):

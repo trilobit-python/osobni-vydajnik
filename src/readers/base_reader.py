@@ -6,7 +6,7 @@ import os.path
 import numpy
 import pandas
 
-from src.utils.file import find_files
+from ..utils import find_files
 
 
 class xReader:
@@ -29,14 +29,9 @@ class xReader:
         self.dictinary_list.append(row)
 
     def get_data_frame(self):
-        df = pandas.DataFrame.from_dict(self.dictinary_list)
+        df = pandas.DataFrame(self.dictinary_list,
+                              columns=['Datum', '»·stka', 'Pozn·mka', 'Operace', 'ID transakce', 'Pl·tce/P¯Ìjemce'])
         df.drop_duplicates(inplace=True)
-        df.columns = ['Datum',
-                      '»·stka',
-                      'Pozn·mka',
-                      'Operace',
-                      'ID transakce',
-                      'Pl·tce/P¯Ìjemce']
         df.sort_values(['Datum', '»·stka'], inplace=True)
         return df
 

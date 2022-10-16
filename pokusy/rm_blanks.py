@@ -32,7 +32,7 @@ else:
                     print("Deleting", dir_path)
                     try:
                         shutil.rmtree(dir_path, onerror=remove_readonly)
-                    except:
+                    except (ValueError, Exception):
                         print("FAILED :")
-            except:
+            except (ValueError, Exception):
                 pass

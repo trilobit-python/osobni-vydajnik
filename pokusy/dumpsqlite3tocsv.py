@@ -7,9 +7,6 @@ Usage:
     dumpsqlite3tocsv foo.db
 """
 
-import codecs
-import csv
-import io as cStringIO
 import os
 import os.path
 import pandas as pd

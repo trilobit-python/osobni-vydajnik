@@ -4,7 +4,7 @@ from io import StringIO
 
 import pandas
 
-from src.readers.base_reader import xReader
+from .base_reader import xReader
 
 
 class AnnaUcetEra(xReader):

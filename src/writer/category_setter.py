@@ -12,9 +12,9 @@ from collections import Counter
 
 import pandas
 
-from src.utils.sqlite_database import SqliteDatabase
+from ..utils.sqlite_database import SqliteDatabase
+from .konstanty import CATEGID_NEZNAMA
 
-from src.writer.base_writer import CATEGID_NEZNAMA
 
 class CategorySetter(object):
     def __init__(self, root_dir_trans_hist, p_db: SqliteDatabase, p_df_kategorie, p_df_podkategorie, p_df_ucty):
@@ -127,16 +127,12 @@ class CategorySetter(object):
     def set_category_by_rules(self, category_rules):
         print("Set_category_by_rules")
         df_pohyby = self.db.query(
-            f'select * from CHECKINGACCOUNT_V1 where CATEGID is NULL or CTEGID = {CATEGID_NEZNAMA} order by TRANSDATE')
+            f'select * from CHECKINGACCOUNT_V1 where CATEGID is NULL or CATEGID = {CATEGID_NEZNAMA} order by TRANSDATE')
         df_pohyby.set_index('TRANSID', inplace=True)
         statistika = Counter()
 
         for index, row in df_pohyby.iterrows():
             statistika['celkem'] += 1
-
-            # if '0003983815' in row.NOTES:
-            #     print(row.NOTES)
-
             for rule in category_rules.values():
                 if re.search(rule['pattern'], row.NOTES):
                     statistika['aktualizovano'] += 1
