@@ -74,7 +74,7 @@ def exif_date_time(filename):
 
     str_cre_date_exif = None
     # hledáme první minímální èas
-    for popis in ['DateTimeOriginal', 'DatetimeDigitized']:
+    for popis in ['DateTimeOriginal', 'DatetimeDigitized', 'DateTime']:
         # for popis in ['DateTime', 'DateTimeOriginal', 'DatetimeDigitized']:
         if popis in exif.keys():
             hodnota = exif[popis]
@@ -114,16 +114,16 @@ def datum_vzniku_z_nazvu(p_filename):
 
 
 def datum_vytvoreni_z_metadat(full_path):
-    extension = os.path.splitext(full_path)[1].lower().replace('.', '')
+    extension = os.path.splitext(full_path)[1].lower().replace('.', '').lower()
 
     if extension in ['jpg']:
         datum_z_metadat = exif_date_time(full_path)
     elif extension in ['mts', 'avi', 'bmp']:
-        datum_z_metadat = datum_vytvoreni_z_media(full_path)
+        datum_z_metadat = MOV_datum_vytvoreni_z_media(full_path)
     elif extension in ['mp4']:
         datum_z_metadat = mp4_metadata_time(full_path)
     elif extension in ['mov']:
-        datum_z_metadat = datum_vytvoreni_z_media(full_path)
+        datum_z_metadat = MOV_datum_vytvoreni_z_media(full_path)
     else:
         raise ValueError(f'Nelze urèit datum vytvoøení z metadat pro soubor: {full_path}')
 
@@ -133,28 +133,26 @@ def datum_vytvoreni_z_metadat(full_path):
     return datum_z_metadat
 
 
-def datum_vytvoreni_z_media(cela_cesta_k_souboru):
+def MOV_datum_vytvoreni_z_media(cela_cesta_k_souboru):
     media_info = MediaInfo.parse(cela_cesta_k_souboru)
     str_recorded_date = None
-    for track in media_info.general_tracks:
-        dict_track = track.to_data()
-        for nazev in ['recorded_date', 'mastered_date', 'tagged_date']:
-            if nazev in dict_track:
-                if not str_recorded_date:
-                    str_recorded_date = dict_track[nazev]
-                else:
-                    str_recorded_date = min(dict_track[nazev], str_recorded_date)
+    str_tag_name = None
 
-        if str_recorded_date:
-            break  # není tøeba testovat další stopy
+    for track in media_info.general_tracks:
+        for nazev in ['comapplequicktimecreationdate', 'recorded_date', 'mastered_date', 'tagged_date']:
+            str_recorded_date = track.to_data().get(nazev, None)
+            if str_recorded_date is not None:
+                str_tag_name = nazev
+                break
 
     if str_recorded_date:
-        # Datum:UTC 2004-12-29 08:17:00.000
+        # Datumy pøíklady :UTC 2004-12-29 08:17:00.000, 2022-12-02T17:22:28+0100
         dvojice_maska_parse_fmt = [(r'^UTC\ (\d{4}-\d{2}-\d{2}\ \d{2}:\d{2}:\d{2})\.(\d{3})$', '%Y-%m-%d %H:%M:%S'),
                                    (r'^UTC\ (\d{4}-\d{2}-\d{2}\ \d{2}:\d{2}:\d{2})$', '%Y-%m-%d %H:%M:%S'),
                                    (r'^(\d{4}-\d{2}-\d{2}\ \d{2}:\d{2}:\d{2})\.(\d{3})$', '%Y-%m-%d %H:%M:%S'),
                                    (r'^(\d{4}-\d{2}-\d{2}\ \d{2}:\d{2}:\d{2}\+\d{2}:\d{2})$', '%Y-%m-%d %H:%M:%S%z'),
-                                   (r'^(\d{4}-\d{2}-\d{2}\ \d{2}:\d{2}:\d{2})$', '%Y-%m-%d %H:%M:%S')]
+                                   (r'^(\d{4}-\d{2}-\d{2}\ \d{2}:\d{2}:\d{2})$', '%Y-%m-%d %H:%M:%S'),
+                                   (r'^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{4})$', '%Y-%m-%dT%H:%M:%S%z')]
         for dvojice in dvojice_maska_parse_fmt:
             maska, parse_fmt = dvojice[0], dvojice[1]
             if re.match(maska, str_recorded_date):
@@ -162,7 +160,7 @@ def datum_vytvoreni_z_media(cela_cesta_k_souboru):
                 vytvoreno = datetime.datetime.strptime(vyraz, parse_fmt)
                 return vytvoreno.astimezone(Praha_TZINFO)
         raise ValueError(
-            f'Nelze urèit datum z metadat pro soubor: {cela_cesta_k_souboru} èas_str:{str_recorded_date}')
+            f'Nelze urèit datum z metadat pro: {cela_cesta_k_souboru} èas_str:{str_recorded_date} tag:{str_tag_name}')
     else:
         return None
 

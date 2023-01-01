@@ -12,11 +12,19 @@ import textwrap
 from argparse import RawTextHelpFormatter
 from collections import Counter
 
-from .ext_file_info import datum_vytvoreni_z_metadat, popis_datetime_tz, datum_vzniku_z_nazvu, \
+from ext_file_info import datum_vytvoreni_z_metadat, popis_datetime_tz, datum_vzniku_z_nazvu, \
     get_file_time_info, set_mtime
 
 # seznam podporovaných pøípon
 PODPOROVANE_PRIPONY = ['jpg', 'mts', 'avi', 'mp4', 'mov']
+DESCRIPTION = textwrap.dedent(f'''
+            popis:
+              pøejmenuje soubory ve stromu dle metadat, pøípadnì èasu vzniku souboru
+                koøen stromu je parametr "dir"
+                pracuje pouze se soubory s pøíponami: {PODPOROVANE_PRIPONY}
+                metadata pro JPG jsou v EXIF, pro MTS a MP4 jsou v hlavièce souboru
+              pozor - opravdu pøejmenuje až pokud je nastavena volba -write jinak pouze vypisuje 
+                ''')
 
 # konstanty pro statistiku
 ZKONTROLOVANO = 'Zkontrolovano'
@@ -80,7 +88,7 @@ def doporuceny_nazev_souboru_bez_pripony(p_cas_vzniku_z_metadat: datetime,
     return None
 
 
-def zpracuj_soubor(p_root, p_fname, celkova_statistika, p_priznaky_nastaveni_programu):
+def zpracuj_soubor(p_root, p_fname, celkova_statistika, p_prejmenuj):
     full_path = os.path.join(p_root, p_fname)
     name, extension = os.path.splitext(os.path.basename(full_path))
     celkova_statistika.update([ZKONTROLOVANO])
@@ -88,9 +96,15 @@ def zpracuj_soubor(p_root, p_fname, celkova_statistika, p_priznaky_nastaveni_pro
     cas_vzniku_z_nazvu = datum_vzniku_z_nazvu(full_path)
     cas_vzniku_z_metadat = datum_vytvoreni_z_metadat(full_path)
 
+    if cas_vzniku_z_metadat is None:
+        print(f'Chyba nelze urèit èas u souboru: {full_path}')
+        cas_vzniku_z_metadat = datum_vytvoreni_z_metadat(full_path)
+        celkova_statistika.update([NELZE_URCIT])
+        return
+
     vytvoreno, zmeneno, otevreno = get_file_time_info(full_path)
     cas_vzniku_ze_souboru = min(vytvoreno, zmeneno, otevreno)
-    if vytvoreno > zmeneno:
+    if (vytvoreno - zmeneno).total_seconds() > 1:  # rozdíl více než 1 vteøina
         print(f'{full_path} Oprava vytvoøeno ({popis_datetime_tz(vytvoreno)}) > zmìnìno ({popis_datetime_tz(zmeneno)})')
         set_mtime(full_path, cas_vzniku_ze_souboru)
     try:
@@ -123,14 +137,15 @@ def zpracuj_soubor(p_root, p_fname, celkova_statistika, p_priznaky_nastaveni_pro
         i += 1
         kam_cela_cesta_soubor_kam = os.path.join(p_root, "%s(%d)%s" % (name, i, extension))
 
-    if OPRAVDU_PREJMENUJ in p_priznaky_nastaveni_programu:
+    if p_prejmenuj:
         print(f'Pøejmenování {full_path} --> {kam_cela_cesta_soubor_kam}')
         os.rename(full_path, kam_cela_cesta_soubor_kam)
         celkova_statistika.update([PREJMENOVANO])
 
 
-def main(p_dir, p_priznaky_nastaveni_programu):
-    source_dir_name = os.path.abspath(p_dir)
+def main(p_config):
+    source_dir_name = os.path.abspath(p_config.dir)
+    prejmenuj = p_config.prejmenuj
     celkova_statistika = Counter()
 
     # sys.stdout.reconfigure(encoding='windows-1250')
@@ -138,40 +153,21 @@ def main(p_dir, p_priznaky_nastaveni_programu):
     print(f'Kontrola/pøejmenování souborù dle metadat (EXIF, MediaInfo, ...), a oprava datumu vytvoøení')
     print(f'Kontroluji strom   : {source_dir_name}')
     print(f'Podporované pøípony: {str(PODPOROVANE_PRIPONY)}')
-    print(f'Pøíznaky nastavení : {str(p_priznaky_nastaveni_programu)}')
+    print(f'Pøíznaky nastavení : {str(prejmenuj)}')
 
     for root, dirs, files in os.walk(source_dir_name, topdown=False):
         for fname in files:
             pripona = os.path.splitext(fname)[1].lower().replace('.', '')
             if pripona in PODPOROVANE_PRIPONY:
-                zpracuj_soubor(root, fname, celkova_statistika, p_priznaky_nastaveni_programu)
+                zpracuj_soubor(root, fname, celkova_statistika, prejmenuj)
 
     print(f'Celková statistika : {dict(celkova_statistika)}')
     print(f'Vše hotovo')
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description=textwrap.dedent(f'''
-            popis:
-              pøejmenuje soubory ve stromu dle metadat, pøípadnì èasu vzniku souboru
-                koøen stromu je parametr "dir"
-                pracuje pouze se soubory s pøíponami: {PODPOROVANE_PRIPONY}
-                metadata pro JPG jsou v EXIF, pro MTS a MP4 jsou v hlavièce souboru
-              pozor - opravdu pøejmenuje až pokud je nastavena volba -write jinak pouze vypisuje 
-                '''),
-        formatter_class=RawTextHelpFormatter)
-
-    parser.add_argument('dir', help='koøenový adresáø stromu pro pøejmenování souborù', default='.')
-    parser.add_argument('--write',
-                        help='fyzicky pžejmenuje soubory, bez tohoto pøíznaku pouze vypisuje', action='store_true',
-                        default=False)
-    a = parser.parse_args()
-
-    priznaky_nastaveni_programu = []
-    if a.write:
-        priznaky_nastaveni_programu.append(OPRAVDU_PREJMENUJ)
-
-    print(a)
-
-    main(a.dir, priznaky_nastaveni_programu)
+    parser = argparse.ArgumentParser(description=DESCRIPTION, formatter_class=RawTextHelpFormatter)
+    parser.add_argument('dir', help='koøenový adresáø stromu pro pøejmenování souborù')
+    parser.add_argument('-p', '--prejmenuj', action='store_true', help='Opravdu pøejmenuje, jinak pouze výpis')
+    config = parser.parse_args()
+    main(config)
