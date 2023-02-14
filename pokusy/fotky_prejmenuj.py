@@ -148,7 +148,6 @@ def main(p_config):
     prejmenuj = p_config.prejmenuj
     celkova_statistika = Counter()
 
-    # sys.stdout.reconfigure(encoding='windows-1250')
     sys.stdout = Logger(source_dir_name)
     print(f'Kontrola/pøejmenování souborù dle metadat (EXIF, MediaInfo, ...), a oprava datumu vytvoøení')
     print(f'Kontroluji strom   : {source_dir_name}')
