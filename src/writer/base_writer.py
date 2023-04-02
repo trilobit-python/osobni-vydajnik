@@ -5,11 +5,12 @@ from collections import Counter
 import pandas as pd
 from pandas import Series
 
+from .category_setter import CategorySetter
+from .konstanty import CATEGID_NEZNAMA
 from ..readers.base_reader import xReader
 from ..utils.common import print_frame
 from ..utils.sqlite_database import SqliteDatabase
-from .category_setter import CategorySetter
-from .konstanty import CATEGID_NEZNAMA
+
 
 class Writer:
     """ Implementuje zápis do MMX databáze sqlite"""
@@ -21,24 +22,8 @@ class Writer:
         self.dfUcty.set_index('ACCOUNTID', inplace=True)
         self.dfKategorie = self.db.query('select * from CATEGORY_V1 order by 1')
         self.dfKategorie.set_index('CATEGID', inplace=True)
-        self.dfPodKategorie = self.db.query('select * from SUBCATEGORY_V1 order by 1')
-        self.dfPodKategorie.set_index('SUBCATEGID', inplace=True)
-
-    # def __del__(self):
-    #     del self
-    #
-    # def __enter__(self):
-    #     try:
-    #         self.conn = sqlite3.connect(self.db_file)
-    #         print('OK sqlite3 connect')
-    #     except sqlite3.Error:
-    #         raise ValueError(f'Failed to connect to database! {sqlite3.Error}')
-    #     return self
-    #
-    # def __exit__(self, exc_type, exc_val, exc_tb):
-    #     if self.conn:
-    #         self.conn.rollback()
-    #         self.conn.close()
+        self.dfPodKategorie = self.db.query('select * from v_cte_category order by 1')
+        self.dfPodKategorie.set_index('CATEGID', inplace=True)
 
     def set_categories(self, root_dir_trans_hist):
         setter = CategorySetter(root_dir_trans_hist, self.db, self.dfKategorie,
@@ -84,7 +69,7 @@ class Writer:
                     ACCOUNTID=accountid, TOACCOUNTID=-1, PAYEEID=1,
                     TRANSCODE=row['Operace'], TRANSAMOUNT=row['Èástka'], STATUS=df_ucet_info.ACCOUNTNAME.values[0],
                     TRANSACTIONNUMBER=row['ID transakce'], NOTES=row['Poznámka'].strip(), TRANSDATE=row['Datum'],
-                    FOLLOWUPID=-1, TOTRANSAMOUNT=0, TRANSID=None, CATEGID=CATEGID_NEZNAMA, SUBCATEGID=None, SUPERTYPE=None)
+                    FOLLOWUPID=-1, TOTRANSAMOUNT=0, TRANSID=None, CATEGID=CATEGID_NEZNAMA, SUPERTYPE=None)
 
                 df_stejne = df_existujici_pohyby[(df_existujici_pohyby["ACCOUNTID"] == accountid)
                                                  & (df_existujici_pohyby["TRANSDATE"] == dict_values['TRANSDATE'])
@@ -130,7 +115,7 @@ class Writer:
         try:
             hodnota_categid = p_transakce.get('CATEGID', 0)
             if hodnota_categid > 0:
-                if self.dfKategorie.loc[p_transakce.CATEGID]['TRANSFER_FLAG'] == 1:
+                if self.dfKategorie.loc[p_transakce.CATEGID]['transfer_flag'] == 1:
                     return 'X'  # transakce je pøevod mezi úèty - nastaveno  kategorií
 
             accounttype = self.dfUcty.loc[p_transakce.ACCOUNTID]['ACCOUNTTYPE']

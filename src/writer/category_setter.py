@@ -12,8 +12,8 @@ from collections import Counter
 
 import pandas
 
-from ..utils.sqlite_database import SqliteDatabase
 from .konstanty import CATEGID_NEZNAMA
+from ..utils.sqlite_database import SqliteDatabase
 
 
 class CategorySetter(object):
@@ -52,15 +52,10 @@ class CategorySetter(object):
     def set_categories(self):
         category_rules = dict()
         # naplneni slovnkiku s pravidly, dotazeni id pro kategorie a subkategorie z db
-        for pattern, categname_subcatname in self.rulePatternCatSubcat.items():
-            if ":" not in categname_subcatname:
-                print("Neni kategorie/subkategorie - nenalezen oddìlovaè[:] data:" + categname_subcatname)
-                sys.exit(-1)
-            categname, subcatname = categname_subcatname.split(":")
-            categid, subcatid = self.find_categid_subcategid(categname, subcatname)
-            if categid is not None:
-                row = {'pattern': pattern, 'categname': categname, 'subcategname': subcatname, 'categid': categid,
-                       'subcatid': subcatid}
+        for pattern, cely_nazev_kategorie in self.rulePatternCatSubcat.items():
+            categid = self.najdi_celou_kategorii(cely_nazev_kategorie)
+            if categid:
+                row = {'pattern': pattern, 'categname': cely_nazev_kategorie, 'categid': categid}
                 category_rules[pattern] = row
         print("CategoryRules:" + str(len(category_rules.items())))
         print()
@@ -68,15 +63,15 @@ class CategorySetter(object):
         self.set_category_by_rules(category_rules)
         self.set_transfers()
 
-    def nastav_prevod_dle_kategorie(self, categ_name, subcateg_name, target_acc_name):
+    def nastav_prevod_dle_kategorie(self, plny_nazev_kategorie, target_acc_name):
         """
            pro všechny pohyby které mají nastavou kategorii-podkategorii
            a nejsou z cílového úètu
            a nejsou to Pøevody nastaví typ pohybu Pøevod na zadaný úèet
         """
-        print(f"  Nastav pøevod pro kategorii: {categ_name} pod kategorii:{subcateg_name} na úèet:{target_acc_name}")
+        print(f"  Nastav pøevod pro kategorii: {plny_nazev_kategorie} na úèet:{target_acc_name}")
 
-        categ_id, subcat_id = self.find_categid_subcategid(categ_name, subcateg_name)
+        categ_id = self.najdi_celou_kategorii(plny_nazev_kategorie)
         if categ_id is None:
             print("    Neexistuje kategorie")
             return
@@ -90,41 +85,31 @@ class CategorySetter(object):
                     set TRANSCODE = 'Transfer', TOACCOUNTID = :target_accid, PAYEEID = -1, TOTRANSAMOUNT = TRANSAMOUNT
                   where ACCOUNTID != :target_accid
                     and CATEGID == :categ_id
-                    and SUBCATEGID == :subcat_id
                     and TRANSCODE != 'Transfer'
         '''
-        parametry = {'target_accid': target_accid, 'subcat_id': subcat_id, 'categ_id': categ_id}
+        parametry = {'target_accid': target_accid, 'categ_id': categ_id}
         self.spust_potvrd_tiskni(sql, parametry, 'Nastaven pøevod pro øádkù')
 
     def set_transfers(self):
         print("set_transfers HOTOVOST")
-        self.nastav_prevod_dle_kategorie('Výbìr hotovosti', None, 'Hotovost')
-        self.nastav_prevod_dle_kategorie('Spoøení', 'Matìj spoøení', 'Stavební spoøení Matìj')
-        self.nastav_prevod_dle_kategorie('Spoøení', 'Stavební spoøení', 'Stavební spoøení')
-        self.nastav_prevod_dle_kategorie('Spoøení', 'Penzijní spoøení', 'Penzijní spoøení')
+        self.nastav_prevod_dle_kategorie('Výbìr hotovosti', 'Hotovost')
+        self.nastav_prevod_dle_kategorie('Spoøení:Matìj spoøení', 'Stavební spoøení Matìj')
+        self.nastav_prevod_dle_kategorie('Spoøení:Stavební spoøení', 'Stavební spoøení')
+        self.nastav_prevod_dle_kategorie('Spoøení:Penzijní spoøení', 'Penzijní spoøení')
 
-    def find_categid_subcategid(self, p_categname, p_subcategname):
+    def najdi_celou_kategorii(self, nazev_cele_kategorie):
         """najde ID z DB pro nazev kategorie a podkategorie
         """
-        df_categorie = self.dfKategorie[self.dfKategorie.CATEGNAME == p_categname]
+        df_categorie = self.dfPodKategorie[self.dfPodKategorie.CATEGNAME == nazev_cele_kategorie]
         if df_categorie.empty:
-            return None, None
+            return None
         if len(df_categorie.index) > 1:
-            raise Exception(f'Nenalezeno více záznamù pro kategorie pro název: {p_categname}')
+            raise Exception(f'Nenalezeno více záznamù pro kategorie pro název: {nazev_cele_kategorie}')
         categid = df_categorie.index[0]
-
-        df_podcategorie = self.dfPodKategorie[(self.dfPodKategorie.SUBCATEGNAME == p_subcategname)
-                                              & (self.dfPodKategorie.CATEGID == categid)]
-
-        if df_podcategorie.empty:
-            return categid, None
-        if len(df_podcategorie.index) > 1:
-            raise Exception(
-                f'Nenalezeno více záznamù pro pod-kategorie pro název: {p_categname}-{p_subcategname}')
-
-        return categid, df_podcategorie.index[0]
+        return categid
 
     def set_category_by_rules(self, category_rules):
+        """Najde všechny pohyby bez kategorie(nebo {CATEGID_NEZNAMA}) a pokusí se ji nastavit pomocí pravidel"""
         print("Set_category_by_rules")
         df_pohyby = self.db.query(
             f'select * from CHECKINGACCOUNT_V1 where CATEGID is NULL or CATEGID = {CATEGID_NEZNAMA} order by TRANSDATE')
@@ -136,9 +121,9 @@ class CategorySetter(object):
             for rule in category_rules.values():
                 if re.search(rule['pattern'], row.NOTES):
                     statistika['aktualizovano'] += 1
-                    sql_upd = 'update CHECKINGACCOUNT_V1 set CATEGID = :categid, SUBCATEGID = :subcatid' \
+                    sql_upd = 'update CHECKINGACCOUNT_V1 set CATEGID = :categid ' \
                               ' where TRANSID = :transid'
-                    data = {'categid': rule['categid'], 'subcatid': rule['subcatid'], 'transid': index}
+                    data = {'categid': rule['categid'], 'transid': index}
                     self.db.execute(sql_upd, data)
 
         # print('*' * 80)
