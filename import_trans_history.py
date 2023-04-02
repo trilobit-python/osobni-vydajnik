@@ -13,6 +13,7 @@ import os
 import sqlite3
 import sys
 
+
 import numpy as np
 
 from src.readers import AirBankBeznyUcet, AirBankSporiciUcet
@@ -28,6 +29,15 @@ class TransHistImporter:
         self.sqlite_file = p_sqlite_file
         self.root_dir_trans_hist = p_root_dir_trans_hist
         self.db = SqliteDatabase(p_sqlite_file)
+        #  TODO: pøejít na SqlAlchemy - ORM
+        # from sqlalchemy import MetaData, create_engine
+        #
+        # CONN = create_engine(DB_URL, client_encoding="UTF-8")
+        #
+        # META_DATA = MetaData(bind=CONN, reflect=True)
+        #
+        # USERS_TABLE = META_DATA.tables['users']
+        #
         self.writer = Writer(self.db)
 
     def __del__(self):
