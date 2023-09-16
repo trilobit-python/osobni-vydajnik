@@ -16,7 +16,7 @@ from ext_file_info import datum_vytvoreni_z_metadat, popis_datetime_tz, datum_vz
     get_file_time_info, set_mtime
 
 # seznam podporovaných pøípon
-PODPOROVANE_PRIPONY = ['jpg', 'mts', 'avi', 'mp4', 'mov']
+PODPOROVANE_PRIPONY = ['jpg', 'mts', 'avi', 'mp4', 'mov', 'heic']
 DESCRIPTION = textwrap.dedent(f'''
             popis:
               pøejmenuje soubory ve stromu dle metadat, pøípadnì èasu vzniku souboru

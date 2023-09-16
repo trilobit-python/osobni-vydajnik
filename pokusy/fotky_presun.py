@@ -14,7 +14,7 @@ from os.path import join
 from ext_file_info import popis_datetime_tz, datum_vzniku_z_nazvu, ensure_dir
 
 # seznam podporovaných pøípon
-PODPOROVANE_PRIPONY = ['jpg', 'mp4', 'mts', 'avi', 'mov']
+PODPOROVANE_PRIPONY = ['jpg', 'mp4', 'mts', 'avi', 'mov', 'heic']
 
 # konstanty pro statistiku
 CHYBA = 'Chyba'

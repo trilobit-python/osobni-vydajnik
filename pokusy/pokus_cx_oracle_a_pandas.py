@@ -1,8 +1,8 @@
 import oracledb
 import pandas as pd
 
-user = 'power_gui'
-password = 'power_gui12345'
+user = 'sys'
+password = 'sys'
 port = 1521
 service_name = 'OEDEV'
 conn_string = "localhost:{port}/{service_name}".format(port=port, service_name=service_name)

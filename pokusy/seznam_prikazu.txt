@@ -1,0 +1,3 @@
+blobost  ffff
+davka.bat parametr1
+davka.bat druhé volání

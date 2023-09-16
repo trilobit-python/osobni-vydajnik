@@ -13,8 +13,11 @@ import os
 import sqlite3
 import sys
 
+from src.gen_classes import CHECKINGACCOUNTV1
+from sqlalchemy.orm import sessionmaker
 
 import numpy as np
+import sqlalchemy
 
 from src.readers import AirBankBeznyUcet, AirBankSporiciUcet
 from src.readers import MBankBeznyUcet, mBank_podnikani_ucet
@@ -29,15 +32,19 @@ class TransHistImporter:
         self.sqlite_file = p_sqlite_file
         self.root_dir_trans_hist = p_root_dir_trans_hist
         self.db = SqliteDatabase(p_sqlite_file)
+        self.dbEngine = sqlalchemy.create_engine(f'sqlite:///{p_sqlite_file}')
+        self.dbEngine.connect()
+        self.session = sessionmaker(bind=self.dbEngine)()
+
+        pohyb = CHECKINGACCOUNTV1()
+        pohyb.add(pohyb)
+        self.session.commit()
+
         #  TODO: pøejít na SqlAlchemy - ORM
         # from sqlalchemy import MetaData, create_engine
-        #
         # CONN = create_engine(DB_URL, client_encoding="UTF-8")
-        #
         # META_DATA = MetaData(bind=CONN, reflect=True)
-        #
         # USERS_TABLE = META_DATA.tables['users']
-        #
         self.writer = Writer(self.db)
 
     def __del__(self):

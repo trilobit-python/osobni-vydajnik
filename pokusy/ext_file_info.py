@@ -14,6 +14,7 @@ import os
 import pathlib
 import re
 
+import mediameta as mm
 import pytz
 import pywintypes
 import win32con
@@ -124,6 +125,8 @@ def datum_vytvoreni_z_metadat(full_path):
         datum_z_metadat = mp4_metadata_time(full_path)
     elif extension in ['mov']:
         datum_z_metadat = MOV_datum_vytvoreni_z_media(full_path)
+    elif extension in ['heic']:
+        datum_z_metadat = HEIC_datum_vytvoreni_z_media(full_path)
     else:
         raise ValueError(f'Nelze urèit datum vytvoøení z metadat pro soubor: {full_path}')
 
@@ -131,6 +134,27 @@ def datum_vytvoreni_z_metadat(full_path):
         if datum_z_metadat < datetime.datetime(1970, 1, 1, 12, 0, 0, tzinfo=Praha_TZINFO):
             datum_z_metadat = None
     return datum_z_metadat
+
+
+def HEIC_datum_vytvoreni_z_media(cela_cesta_k_souboru, pillow_heif=None):
+    try:
+        meta_data = mm.ImageMetadata(cela_cesta_k_souboru)
+        str_recorded_date = meta_data['DateTimeOriginal']
+        str_recorded_date += meta_data['OffsetTimeOriginal'].replace(':', '')  # konverze +02:00 na +0200
+
+        if str_recorded_date:  # oèekávaný øetìzec: 2023:09:02 13:44:47+0200
+            try:
+                vytvoreno = datetime.datetime.strptime(str_recorded_date, '%Y:%m:%d %H:%M:%S%z')
+                return vytvoreno.astimezone(Praha_TZINFO)
+            except:
+                raise ValueError(
+                    f'Nelze urèit datum z metadat pro: {cela_cesta_k_souboru} èas_str:{str_recorded_date}')
+        else:
+            return None
+
+    except mm.UnsupportedMediaFile:
+        raise ValueError(
+            f'Nepodporovaný formát metadat pro: {cela_cesta_k_souboru}')
 
 
 def MOV_datum_vytvoreni_z_media(cela_cesta_k_souboru):

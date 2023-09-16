@@ -62,7 +62,7 @@ class xReader:
     def read(self, root_dir_trans_hist, acc_name, dir_source, file_mask):
         """ TODO dodìlat poøádný popis
             1. najde všechny soubory v adresáøích
-            2. pro každý soubor provede jeho zpracování - parse a vloøení do vydaje
+            2. pro každý soubor provede jeho zpracování - parse a vložení do vydaje
             3. uloží øádky do self.dictinary_list
         """
         dir_source = os.path.join(root_dir_trans_hist, dir_source)
