@@ -36,9 +36,9 @@ class TransHistImporter:
         self.dbEngine.connect()
         self.session = sessionmaker(bind=self.dbEngine)()
 
-        pohyb = CHECKINGACCOUNTV1()
-        pohyb.add(pohyb)
-        self.session.commit()
+        # pohyb = CHECKINGACCOUNTV1()
+        # pohyb.add(pohyb)
+        # self.session.commit()
 
         #  TODO: pøejít na SqlAlchemy - ORM
         # from sqlalchemy import MetaData, create_engine

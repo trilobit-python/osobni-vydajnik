@@ -17,19 +17,19 @@ def seznam_z_retezce(seznam_hodnot: str, oddelovac: str = ','):
 
 def serad_tabulky(csv_tabulky: str, csv_tabulka_X_fk_tabulka: str):
     seznam_tabulek = seznam_z_retezce(csv_tabulky)
-    seznam_zavislostí = seznam_z_retezce(csv_tabulka_X_fk_tabulka)
+    seznam_zavislosti = seznam_z_retezce(csv_tabulka_X_fk_tabulka)
 
     #  naplnìní slovníku tabulka-seznam_fk_tabulek
     slovnik_vstup = {}
     for tabulka in seznam_tabulek:
         slovnik_vstup[tabulka] = []
 
-    for zavislost in seznam_zavislostí:
+    for zavislost in seznam_zavislosti:
         zdroj, fk_tabulka = zavislost.split('-')
         slovnik_vstup[zdroj].append(fk_tabulka)
 
     print(f'Tabulky: {seznam_tabulek} ', end='')
-    print(f' Zavislosti: {seznam_zavislostí}', end='')
+    print(f' Zavislosti: {seznam_zavislosti}', end='')
     # print(slovnik_vstup)
     max_pocet_iteraci = len(seznam_tabulek)
     cislo_iterace = 0

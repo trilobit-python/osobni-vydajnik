@@ -105,7 +105,7 @@ def zpracuj_soubor(p_root, p_fname, celkova_statistika, p_prejmenuj):
     vytvoreno, zmeneno, otevreno = get_file_time_info(full_path)
     cas_vzniku_ze_souboru = min(vytvoreno, zmeneno, otevreno)
     if (vytvoreno - zmeneno).total_seconds() > 1:  # rozdíl více než 1 vteøina
-        print(f'{full_path} Oprava vytvoøeno ({popis_datetime_tz(vytvoreno)}) > zmìnìno ({popis_datetime_tz(zmeneno)})')
+        print(f'{p_fname} Oprava vytvoøeno ({popis_datetime_tz(vytvoreno)}) > zmìnìno ({popis_datetime_tz(zmeneno)})')
         set_mtime(full_path, cas_vzniku_ze_souboru)
     try:
         novy_nazev_bez_pripony = doporuceny_nazev_souboru_bez_pripony(cas_vzniku_z_metadat, cas_vzniku_z_nazvu,

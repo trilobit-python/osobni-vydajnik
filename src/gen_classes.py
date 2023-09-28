@@ -225,6 +225,7 @@ class PAYEEV1(Base):
     WEBSITE = Column(Text)
     NOTES = Column(Text)
     ACTIVE = Column(Integer)
+    PATTERN = Column(Text, server_default=text("''"))
 
 
 class REPORTV1(Base):

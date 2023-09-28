@@ -7,12 +7,9 @@ port = 1521
 service_name = 'OEDEV'
 conn_string = "localhost:{port}/{service_name}".format(port=port, service_name=service_name)
 
-with oracledb.connect(user=user, password=password, dsn=conn_string) as conn:
+with oracledb.connect(user=user, password=password, dsn=conn_string, mode=oracledb.AUTH_MODE_SYSDBA) as conn:
     sql = """
-        select current_timestamp as ts, 1 as id from dual
-    """
-    sql = """
-        select * from user_objects order by 1
+        select * from all_objects where owner='OES' order by 1
     """
     df = pd.read_sql(sql=sql, con=conn)
     print(df)
