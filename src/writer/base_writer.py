@@ -86,12 +86,11 @@ class Writer:
 
                 if len(df_stejne.index) == 0:  # nová hodnota pro vložení
                     print(f'Insert {str(dict_values)}')
-                    nove_vkladane_radky = nove_vkladane_radky.append(dict_values, ignore_index=True)
-                    # df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-                    # df.loc[len(df)] = new_row
-                    # nove_vkladane_radky.loc[len(nove_vkladane_radky)] = dict_values
-                    # nove_vkladane_radky = pd.concat([nove_vkladane_radky,
-                    #                                                   pd.DataFrame([dict_values])], ignore_index=True)
+                    pd_prirustek = pd.DataFrame([dict_values])
+                    if (not nove_vkladane_radky.empty) & (not pd_prirustek.empty):
+                        # nove_vkladane_radky = nove_vkladane_radky.append(dict_values, ignore_index=True)
+                        nove_vkladane_radky = pd.concat([nove_vkladane_radky, pd_prirustek],
+                                                        ignore_index=True)
                 elif len(df_stejne.index) == 1:  # OK existuje již právì jeden v DB
                     pass
                 else:
