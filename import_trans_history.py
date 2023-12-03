@@ -25,6 +25,7 @@ from src.readers import Raiffeisen_cards, Raiffeisen_sporici_ucet, Raiffeisen_be
 from src.utils import get_backup_filename, copy_file
 from src.utils import SqliteDatabase
 from src.writer import Writer
+from src.ximporter import import_bank_vypis
 
 
 class TransHistImporter:
@@ -74,6 +75,7 @@ class TransHistImporter:
         ]
         for reader in readers:
             reader.read(self.root_dir_trans_hist)
+            import_bank_vypis(reader.accName)
             print(reader.accName)
             self.writer.zapis_do_db(reader)
 
