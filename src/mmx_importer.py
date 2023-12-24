@@ -33,6 +33,18 @@ class Style:
 DESCRIPTION = 'Import výpisů z bank do programu MoneyManagerEx'
 
 
+def pretypovani_sloupcu(df: pd.DataFrame, dny: str, casy: str, castky: str, fmt_dny: str = '%d/%m/%Y',
+                        fmt_cas: str = '%d/%m/%Y %H:%M:%S', fmt_castky: str = '%n'):
+    seznam_datum = dny.split(',')
+    df[seznam_datum] = df[seznam_datum].apply(lambda x: pd.to_datetime(x, format=fmt_dny, utc=False).dt.date)
+    seznam_cas = casy.split(',')
+    df[seznam_cas] = df[seznam_cas].apply(lambda x: pd.to_datetime(x, format=fmt_cas, utc=False).dt.date)
+    seznam_castka = castky.split(',')
+    # df.a = df.a.astype(float).fillna(0.0)
+    df[seznam_castka] = df[seznam_castka].replace(regex={',': '.'}).astype(float).fillna(0.0)
+    # print(df.dtypes)
+
+
 @click.command('mmx_importer', help=DESCRIPTION)
 @click.argument('mmx_file', type=click.Path(exists=True, file_okay=True, readable=True))
 @click.argument('trans_hist_dir', type=click.Path(exists=True, file_okay=False, readable=True, path_type=Path))
@@ -58,7 +70,6 @@ def main(mmx_file, trans_hist_dir):
         and av.vypis_adresar is not NULL
         and av.vypis_nazev_maska is not NULL
         order by av.ACCOUNTID"""))
-    # echo(df.to_string())
 
     for ucet in df_ucty.itertuples(name='účet'):
         echo(f'** Importuji výpisy {ucet.ACCOUNTNAME}', nl=False)
@@ -70,26 +81,45 @@ def main(mmx_file, trans_hist_dir):
             csv_cela_cesta = (p / i)
             echo('   ' + str(csv_cela_cesta))
 
+            from hashlib import md5
+            from mmap import mmap, ACCESS_READ
+
+            with open(csv_cela_cesta) as file, mmap(file.fileno(), 0, access=ACCESS_READ) as file:
+                print(f'{csv_cela_cesta}:{md5(file).hexdigest()}')
+
+            # načteme vše jako řetězce pak nastavíme správné typy
+            col_names = pd.read_csv(csv_cela_cesta, nrows=0, encoding='cp1250', delimiter=';').columns
+            types_dict = {}
+            types_dict.update({col: str for col in col_names if col not in types_dict})
+            rows = pd.read_csv(csv_cela_cesta, dtype=types_dict, encoding='cp1250', delimiter=';')
+
             if ucet.importer_trida == 'AirBankImporter':
+                # 'Směr úhrady', 'Typ úhrady', ' Kategorie plateb', ' Měna účtu', ' Částka v měně účtu',
+                # 'Poplatek v měně účtu', ' Původní měna úhrady', ' Původní částka úhrady', ' Název protistrany',
+                # 'Číslo účtu protistrany', ' Název účtu protistrany', ' Variabilní symbol', ' Konstantní symbol',
+                # 'Specifický symbol', ' Zdrojová obálka', ' Cílová obálka', ' Poznámka pro mne',
+                # 'Zpráva pro příjemce', ' Poznámka k úhradě', ' Název karty', ' Číslo karty', ' Držitel karty',
+                # 'Název zařízení', ' Obchodní místo', ' Směnný kurz', ' Odesílatel poslal', ' Poplatky jiných bank',
+                # 'Datum a čas zadání', ' Datum splatnosti', ' Datum schválení', ' Datum zaúčtování',
+                # 'Referenční číslo', 'Způsob zadání', 'Zadal', ' Zaúčtováno', ' Pojmenování příkazu',
+                # 'Název, adresa a stát protistrany', 'Název, adresa a stát banky protistrany', 'Typ poplatku',
+                # 'Účel úhrady', 'Zvláštní pokyny k úhradě', 'Související úhrady', 'Další identifikace úhrady',
+                # 'Způsob úhrady'
 
-                # načteme vše jako řetězce pak nastavíme správné typy
-                rows = pd.read_csv(csv_cela_cesta, delimiter=';', encoding='cp1250', keep_default_na=False, dtype=str)
-                datumy = ['Datum provedení', # 'Datum a čas zadání',
-                          'Datum splatnosti', 'Datum schválení', 'Datum zaúčtování']
-                # rows[datumy] = pd.to_datetime(rows[datumy], format='%d/%m/%Y')
-                # rows[datumy] = pd.to_datetime(rows[datumy])
-                rows[datumy] = rows[datumy].apply(
-                    lambda x: pd.to_datetime(x, errors='coerce', format='%d/%m/%Y', utc=False).dt.date)
-                print(rows.applymap(type).to_string())
+                datumove_sloupce = 'Datum provedení,Datum splatnosti,Datum schválení,Datum zaúčtování'.split(',')
+                datum_a_cas_sloupce = ['Datum a čas zadání']
 
-
+                pretypovani_sloupcu(rows, dny='Datum provedení,Datum splatnosti,Datum schválení,Datum zaúčtování',
+                                    casy='Datum a čas zadání',
+                                    castky='Částka v měně účtu,Původní částka úhrady,Poplatek v měně účtu,'
+                                         'Směnný kurz,Poplatky jiných bank')
+                # print(rows.info)
 
             else:
                 raise ValueError(f'Nenámá třída({ucet.importer_trida}) nelze provést import.')
 
-            rows['ACCOUNTID'] = ucet.ACCOUNTID
+            rows.insert(0, 'ACCOUNT', ucet.ACCOUNTID)
             rows.to_sql(ucet.importer_trida, con=engine, if_exists='replace')
-            print(rows)
 
         echo('')
 

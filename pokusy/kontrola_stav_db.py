@@ -5,34 +5,26 @@
 #
 
 import datetime
+import getpass
+import logging
 import os
 
 import oracledb
 import pandas as pd
-import getpass
-import logging
 
-dotazy = [('Nazev instance', 'select ora_database_name, user, systimestamp from dual'),
-          ('Statistiky tabulek',
-           """
+dotazy = [('Nazev instance', 'select ora_database_name, user, systimestamp from dual'), ('Statistiky tabulek', """
                SELECT owner,table_name,partition_name,object_type,num_rows,blocks,empty_blocks,last_analyzed
                  FROM all_tab_statistics a
                 WHERE owner in ( 'BSP', 'OES', 'ICMADMIN', 'RMADMIN', 'POWER_GUI')
                   AND num_rows is not null
                   AND num_rows > 0
                 ORDER BY a.last_analyzed desc
-           """
-           ),
-          ('Invalidni objekty',
-           """
+           """), ('Invalidni objekty', """
             SELECT  OWNER, OBJECT_NAME, OBJECT_TYPE, STATUS
             FROM    DBA_OBJECTS
             WHERE   STATUS = 'INVALID'
             ORDER BY OWNER, OBJECT_TYPE, OBJECT_NAME
-            """
-           ),
-          ('Volne misto',
-           """
+            """), ('Volne misto', """
            SELECT
                f.tablespace_name,
                TO_CHAR( (t.total_space - f.free_space),'999,999') "USED (MB)",
@@ -69,8 +61,7 @@ dotazy = [('Nazev instance', 'select ora_database_name, user, systimestamp from 
            WHERE
                f.tablespace_name = t.tablespace_name
                AND ( round( (f.free_space / t.total_space) * 100) ) < 10
-           """)
-          ]
+           """)]
 
 
 def xprint(arg):
@@ -103,7 +94,7 @@ def main():
     for env in ['NOE', 'ACC', 'PRO']:
         for db_inst in ['OEICM01', 'OEICM02', 'OE', 'OEPUG', 'OEMIG']:
             bExistuje = True
-            ##            neexistujici kombinace
+            ## neexistujici kombinace
             if env in ['PRO', 'ACC'] and db_inst == 'OEPUG':
                 bExistuje = False
             if env in ['NOE'] and db_inst == 'OEMIG':
@@ -114,17 +105,12 @@ def main():
                 if (env == 'ACC' and db_inst == 'OEPUG') == False:
                     if (env == 'PRO' and db_inst == 'OEPUG') == False:
                         check_ora_database_name(full_inst_name, pwd)
-                        xprint(
-                            '---------------------------------------------------------------------------------------------------')
+                        xprint('-' * 119)
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        filename=f"kontrola_db_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.log",
-        level=logging.INFO,
-        datefmt="%Y-%m-%d %H:%M:%S",
-        format='%(message)s'
-    )
+    logging.basicConfig(filename=f"kontrola_db_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.log",
+        level=logging.INFO, datefmt="%Y-%m-%d %H:%M:%S", format='%(message)s')
     logging.getLogger().addHandler(logging.StreamHandler())
 
     source_dir_name = os.getcwd()
